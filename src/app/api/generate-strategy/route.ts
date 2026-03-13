@@ -9,7 +9,10 @@ const ACTOR_CATALOG = {
   LINKEDIN_DEEP: 'apify/linkedin-search-scraper',
   GOOGLE_SEARCH: 'apify/google-search-scraper',
   BING_SEARCH: 'apify/bing-search-scraper',
-  TWITTER_SEARCH: 'apify/twitter-scraper-lite'
+  TWITTER_SEARCH: 'apify/twitter-scraper-lite',
+  GITHUB_SEARCH: 'apify/github-user-scraper',
+  INSTAGRAM: 'apify/instagram-scraper',
+  REDDIT: 'apify/reddit-scraper'
 };
 
 const DEFAULT_STRATEGY = {
@@ -38,28 +41,34 @@ export async function POST(req: Request) {
       });
 
       const prompt = `
-        You are an elite Lead Discovery Strategist for CareerXcelerator. 
-        Your goal is to find the absolute best profiles for:
+        You are an elite Multi-Channel Lead Discovery Strategist for CareerXcelerator. 
+        Analyze the candidate persona:
         - Objective: ${params.audience}
         - Origin: ${params.originCountry}
         - Location: ${params.currentLocation}
         - Fields: ${params.fields}
         
-        DYNAMIC INTELLIGENCE RULES:
-        1. PLATFORM: Decide which platform is best (LinkedIn for professionals, Google/Bing for broad discovery, X for tech-heavy niches).
-        2. ACTOR: Select the specific actor from this verified catalog:
-           - "apify/linkedin-profile-search": Best for finding people by specific job/student titles on LinkedIn.
-           - "apify/linkedin-search-scraper": Best for deep search queries and broad LinkedIn scraping.
-           - "apify/google-search-scraper": Best for finding university directories or public portfolios via Google.
-           - "apify/bing-search-scraper": Best alternative to Google for non-indexed profiles.
-        3. QUERIES: Generate 3-5 high-intent search queries optimized for the chosen platform.
+        DYNAMIC INTELLIGENCE RULES (PLATFORM MATCHING):
+        1. Professional/Corporate/Academic: Use LinkedIn or Google Search.
+        2. Software/Tech/Open Source: Use GitHub or LinkedIn.
+        3. Creative/Design/Influencer/Fashion: Use Instagram or Google Search.
+        4. Niche Communities/Unfiltered Sentiment: Use Reddit.
+        5. Tech-Talk/Real-time/Industry News: Use Twitter (X).
+        
+        ACTOR CATALOG MAP (Choose the absolute best):
+        - "apify/linkedin-profile-search": Precision lead finding on LinkedIn.
+        - "apify/linkedin-search-scraper": Broad profile harvesting.
+        - "apify/github-user-scraper": Essential for Technical/SWE leads.
+        - "apify/instagram-scraper": Best for finding portfolios and creators.
+        - "apify/reddit-scraper": Use for community-based sentiment or gathering handles.
+        - "apify/google-search-scraper": Best for broad web/directory discovery.
         
         Respond ONLY with a JSON object:
         {
           "platforms": ["Selected Platform"],
-          "searchQueries": ["query 1", "query 2", ...],
+          "searchQueries": ["Optimized query 1", "query 2", ...],
           "apifyActors": ["selected-actor-id"],
-          "reasoning": "Brief explanation of why this platform/actor was chosen"
+          "reasoning": "Detailed logic for choosing this specific mix"
         }
       `;
 

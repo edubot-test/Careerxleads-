@@ -33,14 +33,16 @@ export async function POST(req: Request) {
     
     // Normalize Input Schema
     let actorInput: any = { count: 20 };
-    if (actorId.includes('linkedin-profile-search')) {
+    if (actorId.includes('linkedin-profile-search') || actorId.includes('linkedin-search-scraper')) {
       actorInput.queries = queries;
-    } else if (actorId.includes('linkedin-search-scraper')) {
-      actorInput.queries = queries;
-    } else if (actorId.includes('google-search-scraper')) {
+    } else if (actorId.includes('google-search-scraper') || actorId.includes('bing-search-scraper')) {
       actorInput.queries = queries.join('\n');
-    } else if (actorId.includes('bing-search-scraper')) {
-      actorInput.queries = queries.join('\n');
+    } else if (actorId.includes('github-user-scraper')) {
+      actorInput.q = queries[0]; // GitHub scraper usually takes a single query or list
+    } else if (actorId.includes('instagram-scraper')) {
+      actorInput.search = queries[0];
+    } else if (actorId.includes('reddit-scraper')) {
+      actorInput.searches = queries;
     } else {
       actorInput.queries = queries;
     }
@@ -102,17 +104,31 @@ export async function POST(req: Request) {
       
       // Normalize Output Schema for AI Gatekeeper
       const profiles = items.map((item: any, idx: number) => {
-        // Handle Google/Bing results vs Profile results
         const isSearch = actorId.includes('search-scraper') && !actorId.includes('linkedin');
+        const isGithub = actorId.includes('github');
+        const isInstagram = actorId.includes('instagram');
+        const isReddit = actorId.includes('reddit');
         
         return {
           id: item.id || `sc-${idx}`,
-          fullName: isSearch ? (item.title || 'Unknown') : (item.fullName || item.name || 'Unknown'),
-          url: isSearch ? (item.url || item.link || '') : (item.url || item.profileUrl || ''),
-          headline: isSearch ? (item.description || item.snippet || '') : (item.headline || item.title || ''),
+          fullName: isGithub ? (item.name || item.username) : 
+                    isInstagram ? (item.fullName || item.username) :
+                    isReddit ? item.author :
+                    isSearch ? (item.title || 'Unknown') : 
+                    (item.fullName || item.name || 'Unknown'),
+          url: isGithub ? (item.url || `https://github.com/${item.username}`) :
+               isInstagram ? (item.url || `https://instagram.com/${item.username}`) :
+               isReddit ? item.url :
+               isSearch ? (item.url || item.link || '') : 
+               (item.url || item.profileUrl || ''),
+          headline: isGithub ? item.bio :
+                    isInstagram ? item.biography :
+                    isReddit ? item.body :
+                    isSearch ? (item.description || item.snippet || '') : 
+                    (item.headline || item.title || ''),
           location: item.location || '',
           education: item.education || [],
-          email: item.email || null,
+          email: item.email || item.publicEmail || null,
           metadata: { platform: strategy.platforms?.[0] || 'Unknown', actor: actorId }
         };
       });
