@@ -27,22 +27,32 @@ export async function POST(req: Request) {
       return NextResponse.json({ profiles: mockProfiles });
     }
     
-    // ── Dynamic Actor Selection ──
-    // Prioritize actor recommended by the strategy (AI decided)
-    let actorId = strategy.apifyActors?.[0] || process.env.APIFY_LINKEDIN_ACTOR_ID || 'apify/linkedin-profile-search';
+    // ── Smart Actor Router ──
+    const actorId = strategy.apifyActors?.[0] || 'apify/linkedin-profile-search';
     const normalizedActorId = actorId.replace('/', '~');
     
-    console.log(`Starting Apify Actor (${normalizedActorId}) via fetch...`);
+    // Normalize Input Schema
+    let actorInput: any = { count: 20 };
+    if (actorId.includes('linkedin-profile-search')) {
+      actorInput.queries = queries;
+    } else if (actorId.includes('linkedin-search-scraper')) {
+      actorInput.queries = queries;
+    } else if (actorId.includes('google-search-scraper')) {
+      actorInput.queries = queries.join('\n');
+    } else if (actorId.includes('bing-search-scraper')) {
+      actorInput.queries = queries.join('\n');
+    } else {
+      actorInput.queries = queries;
+    }
+
+    console.log(`Routing to Actor: ${actorId} with ${queries.length} queries...`);
     
     try {
       // 1. Start the actor run
       const startRunRes = await fetch(`https://api.apify.com/v2/acts/${normalizedActorId}/runs?token=${APIFY_TOKEN}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          queries: queries.length > 0 ? queries : ['Masters students USA Indian origin'],
-          count: 20
-        })
+        body: JSON.stringify(actorInput)
       });
 
       const runInfo = await startRunRes.json();
@@ -65,7 +75,7 @@ export async function POST(req: Request) {
         const statusData = await checkRes.json();
         const status = statusData.data.status;
         
-        console.log(`Run ${runId} status: ${status}`);
+        console.log(`Run status: ${status}`);
 
         if (status === 'SUCCEEDED') {
           const itemsRes = await fetch(`https://api.apify.com/v2/datasets/${datasetId}/items?token=${APIFY_TOKEN}`);
@@ -75,33 +85,37 @@ export async function POST(req: Request) {
           throw new Error(`Apify Run ${status}`);
         }
         
-        // Even if not succeeded, check if items are being populated
+        // Grab partials
         const itemsRes = await fetch(`https://api.apify.com/v2/datasets/${datasetId}/items?token=${APIFY_TOKEN}`);
         const currentItems = await itemsRes.json();
         if (currentItems.length > 0) {
-          console.log(`Captured ${currentItems.length} partial results while run is in progress...`);
           items = currentItems;
-          // If we have enough for a demo, we can break early
           if (items.length >= 5) break; 
         }
 
-        await new Promise(r => setTimeout(r, 4000)); // Poll every 4s
+        await new Promise(r => setTimeout(r, 4000));
       }
 
       if (items.length === 0) {
-        throw new Error('No items found in dataset after polling');
+        throw new Error('No items found in dataset');
       }
       
-      const profiles = items.map((item: any, idx: number) => ({
-        id: item.id || `apify-${idx}`,
-        fullName: item.fullName || item.name || 'Unknown',
-        url: item.url || item.profileUrl || '',
-        headline: item.headline || item.title || '',
-        location: item.location || '',
-        education: item.education || [],
-        email: item.email || null,
-        raw: item
-      }));
+      // Normalize Output Schema for AI Gatekeeper
+      const profiles = items.map((item: any, idx: number) => {
+        // Handle Google/Bing results vs Profile results
+        const isSearch = actorId.includes('search-scraper') && !actorId.includes('linkedin');
+        
+        return {
+          id: item.id || `sc-${idx}`,
+          fullName: isSearch ? (item.title || 'Unknown') : (item.fullName || item.name || 'Unknown'),
+          url: isSearch ? (item.url || item.link || '') : (item.url || item.profileUrl || ''),
+          headline: isSearch ? (item.description || item.snippet || '') : (item.headline || item.title || ''),
+          location: item.location || '',
+          education: item.education || [],
+          email: item.email || null,
+          metadata: { platform: strategy.platforms?.[0] || 'Unknown', actor: actorId }
+        };
+      });
 
       return NextResponse.json({ profiles });
 
