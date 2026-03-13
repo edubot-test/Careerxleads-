@@ -26,23 +26,22 @@ export async function POST(req: Request) {
     try {
       // Use 'gemini-1.5-flash-latest' which is the common alias for the newest flash model
       const model = genAI.getGenerativeModel({ 
-        model: 'gemini-1.5-flash', 
+        model: 'gemini-2.0-flash', 
         generationConfig: { responseMimeType: "application/json" }
       });
 
       const prompt = `
-        You are an expert AI Lead Generation operator for CareerXcelerator. 
-        Based on these audience parameters:
-        - Audience: ${params.audience}
-        - Origin Country: ${params.originCountry}
-        - Current Location: ${params.currentLocation}
-        - Stage: ${params.stage}
+        You are an expert Lead Discovery Strategist. 
+        Analyze these requirements:
+        - Goal: ${params.audience}
+        - Origin: ${params.originCountry}
+        - Location: ${params.currentLocation}
         - Fields: ${params.fields}
-        - Looking for: ${params.opportunityTypes}
         
-        Generate a search strategy.
-        
-        Respond ONLY with a JSON object:
+        Generate:
+        1. A set of precision search queries.
+        2. The most effective Apify actor for this specific task.
+           Options: "apify/linkedin-profile-search" (general), "apify/linkedin-search-scraper" (deep), or "apify/google-search-scraper" (broad).
         {
           "platforms": ["Platform 1", "Platform 2"],
           "searchQueries": ["query 1", "query 2", "query 3"],
