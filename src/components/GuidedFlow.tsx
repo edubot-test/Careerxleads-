@@ -19,40 +19,45 @@ interface Question {
 const questions: Question[] = [
   {
     key: 'audience',
-    text: 'Who are you trying to reach?',
-    examples: ['Students looking for internships', 'Students looking for jobs', 'Recent graduates', 'Early career professionals', 'Career switchers']
+    text: 'What is the primary persona for this discovery?',
+    examples: ['Masters Students', 'Final Year Undergraduate', 'Recent Graduates (2023-24)', 'Early Professionals (1-3 yrs exp)', 'Mid-level (3-5 yrs exp)']
   },
   {
     key: 'originCountry',
-    text: 'Which country are these candidates originally from?',
-    examples: ['India', 'China', 'Nigeria']
+    text: 'Which origin country should we prioritize for this batch?',
+    examples: ['India', 'China', 'Nigeria', 'Targeting Diverse Global Students']
   },
   {
     key: 'currentLocation',
-    text: 'Where are these candidates currently studying or working?',
-    examples: ['United States', 'Ireland', 'Canada', 'United Kingdom', 'Australia']
+    text: 'Where should these candidates be studying or working now?',
+    examples: ['United States (F1/H1B)', 'United Kingdom', 'Canada', 'Ireland', 'Germany']
   },
   {
     key: 'stage',
-    text: 'What stage are these candidates in?',
-    examples: [],
-    options: ['Undergraduate students', 'Master\'s students', 'Recent graduates', 'Early professionals']
+    text: 'What is their exact current professional/academic stage?',
+    options: [
+      'Current Student (Seeking Internships)', 
+      'Final Year (Seeking Full-time)', 
+      'Recent Graduate (Job Hunting)', 
+      'Working Professional (1-5 yrs exp)'
+    ],
+    examples: []
   },
   {
     key: 'fields',
-    text: 'Which fields should we focus on?',
-    examples: ['Computer Science', 'Data Science', 'Business Analytics', 'Engineering', 'MBA']
+    text: 'Which specific fields or tech domains are we focusing on?',
+    examples: ['Computer Science', 'Data Science/AI', 'Business Analytics', 'Management/MBA', 'Bio-Medical Engineering']
   },
   {
     key: 'opportunityTypes',
-    text: 'What type of opportunities are they likely looking for?',
-    examples: [],
-    options: ['Internships', 'Full-time jobs', 'Both']
+    text: 'What is the primary intent we are scanning for?',
+    options: ['Summer Internships 2025', 'Immediate Full-time Hiring', 'Lateral Job Switch (Experienced)', 'Upskilling/Research Opportunities'],
+    examples: []
   },
   {
     key: 'leadCount',
-    text: 'How many leads should we generate?',
-    examples: ['100', '500', '1000']
+    text: 'How many vetted leads (meeting quality score ≥6) should the agent find?',
+    examples: ['100', '250', '500', '1000']
   }
 ];
 
