@@ -28,17 +28,17 @@ export async function POST(req: Request) {
     }
     
     // ── Smart Actor Router ──
-    const actorId = strategy.apifyActors?.[0] || 'apify/linkedin-profile-search';
+    const actorId = strategy.apifyActors?.[0] || 'harvestapi/linkedin-profile-search';
     const normalizedActorId = actorId.replace('/', '~');
     
     // Normalize Input Schema
     let actorInput: any = { count: 20 };
-    if (actorId.includes('linkedin-profile-search') || actorId.includes('linkedin-search-scraper')) {
+    if (actorId.includes('linkedin-profile-search') || actorId.includes('linkedin-people-search-scraper')) {
       actorInput.queries = queries;
     } else if (actorId.includes('google-search-scraper') || actorId.includes('bing-search-scraper')) {
       actorInput.queries = queries.join('\n');
-    } else if (actorId.includes('github-user-scraper')) {
-      actorInput.q = queries[0]; // GitHub scraper usually takes a single query or list
+    } else if (actorId.includes('github-users-scraper')) {
+      actorInput.q = queries[0]; 
     } else if (actorId.includes('instagram-scraper')) {
       actorInput.search = queries[0];
     } else if (actorId.includes('reddit-scraper')) {
@@ -47,7 +47,9 @@ export async function POST(req: Request) {
       actorInput.queries = queries;
     }
 
-    console.log(`Routing to Actor: ${actorId} with ${queries.length} queries...`);
+    const timestamp = new Date().toLocaleTimeString();
+    console.log(`[${timestamp}] Routing to Actor: ${actorId} with ${queries.length} queries...`);
+    console.log('Actor Input Package:', JSON.stringify(actorInput, null, 2));
     
     try {
       // 1. Start the actor run
@@ -58,8 +60,10 @@ export async function POST(req: Request) {
       });
 
       const runInfo = await startRunRes.json();
+      console.log('Apify Start Run Response:', JSON.stringify(runInfo, null, 2));
+      
       if (!startRunRes.ok) {
-        throw new Error(runInfo.error?.message || 'Failed to start run');
+        throw new Error(runInfo.error?.message || `Failed to start run: Status ${startRunRes.status}`);
       }
 
       const runId = runInfo.data.id;
@@ -136,7 +140,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ profiles });
 
     } catch (apifyError: any) {
-      console.error('Apify API failure:', apifyError.message);
+      console.error('--- APIFY FAILURE DETECTED ---');
+      console.error('Error Message:', apifyError.message);
+      if (apifyError.stack) console.error('Stack:', apifyError.stack);
+      
       return NextResponse.json({ 
         profiles: mockProfiles, 
         warning: 'Apify search failed or timed out, using fallback profiles',

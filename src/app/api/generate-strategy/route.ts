@@ -1,18 +1,20 @@
 import { NextResponse } from 'next/server';
 import { GenerationParams } from '@/types';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import Anthropic from '@anthropic-ai/sdk';
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+const anthropic = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY || '',
+});
 
 const ACTOR_CATALOG = {
-  LINKEDIN_CORE: 'apify/linkedin-profile-search',
-  LINKEDIN_DEEP: 'apify/linkedin-search-scraper',
+  LINKEDIN_CORE: 'harvestapi/linkedin-profile-search',
+  LINKEDIN_DEEP: 'logical_scrapers/linkedin-people-search-scraper',
   GOOGLE_SEARCH: 'apify/google-search-scraper',
-  BING_SEARCH: 'apify/bing-search-scraper',
+  BING_SEARCH: 'tri_angle/bing-search-scraper',
   TWITTER_SEARCH: 'apify/twitter-scraper-lite',
-  GITHUB_SEARCH: 'apify/github-user-scraper',
+  GITHUB_SEARCH: 'dtrungtin/github-users-scraper',
   INSTAGRAM: 'apify/instagram-scraper',
-  REDDIT: 'apify/reddit-scraper'
+  REDDIT: 'trudax/reddit-scraper'
 };
 
 const DEFAULT_STRATEGY = {
@@ -28,18 +30,12 @@ export async function POST(req: Request) {
   try {
     const params = await req.json() as GenerationParams;
     
-    if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === '') {
-      console.log('No Gemini API key found, returning mock strategy.');
+    if (!process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY === '') {
+      console.log('No Anthropic API key found, returning mock strategy.');
       return NextResponse.json(DEFAULT_STRATEGY);
     }
 
     try {
-      // Use 'gemini-1.5-flash-latest' which is the common alias for the newest flash model
-      const model = genAI.getGenerativeModel({ 
-        model: 'gemini-2.0-flash', 
-        generationConfig: { responseMimeType: "application/json" }
-      });
-
       const prompt = `
         You are an elite Multi-Channel Lead Discovery Strategist for CareerXcelerator. 
         Analyze the candidate persona:
@@ -56,11 +52,11 @@ export async function POST(req: Request) {
         5. Tech-Talk/Real-time/Industry News: Use Twitter (X).
         
         ACTOR CATALOG MAP (Choose the absolute best):
-        - "apify/linkedin-profile-search": Precision lead finding on LinkedIn.
-        - "apify/linkedin-search-scraper": Broad profile harvesting.
-        - "apify/github-user-scraper": Essential for Technical/SWE leads.
+        - "harvestapi/linkedin-profile-search": Precision lead finding on LinkedIn.
+        - "logical_scrapers/linkedin-people-search-scraper": Broad profile harvesting.
+        - "dtrungtin/github-users-scraper": Essential for Technical/SWE leads.
         - "apify/instagram-scraper": Best for finding portfolios and creators.
-        - "apify/reddit-scraper": Use for community-based sentiment or gathering handles.
+        - "trudax/reddit-scraper": Use for community-based sentiment or gathering handles.
         - "apify/google-search-scraper": Best for broad web/directory discovery.
         
         Respond ONLY with a JSON object:
@@ -72,21 +68,23 @@ export async function POST(req: Request) {
         }
       `;
 
-      const result = await model.generateContent({
-        contents: [{ role: 'user', parts: [{ text: prompt }] }]
+      const msg = await anthropic.messages.create({
+        model: 'claude-3-5-sonnet-20241022',
+        max_tokens: 1024,
+        messages: [{ role: 'user', content: prompt }],
+        system: "You are a professional lead generation AI. You must respond in valid JSON format only."
       });
-      
-      const response = await result.response;
-      let text = response.text();
+
+      const responseContent = msg.content[0].type === 'text' ? msg.content[0].text : '';
       
       // Safety parsing
-      text = text.replace(/```json/g, '').replace(/```/g, '').trim();
-      const strategy = JSON.parse(text);
+      const jsonStr = responseContent.replace(/```json/g, '').replace(/```/g, '').trim();
+      const strategy = JSON.parse(jsonStr);
       
       return NextResponse.json(strategy);
 
     } catch (apiError: any) {
-      console.error('Gemini API Error (generate-strategy):', apiError.message);
+      console.error('Anthropic API Error (generate-strategy):', apiError.message);
       // Absolute safety fallback
       return NextResponse.json(DEFAULT_STRATEGY);
     }

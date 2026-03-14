@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import Anthropic from '@anthropic-ai/sdk';
 import { Lead } from '@/types';
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+const anthropic = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY || '',
+});
 
 // Constants for backend validation
 const SENIOR_TITLES = ['director', 'vp', 'vice president', 'head of', 'chief', 'cto', 'ceo', 'cfo', 'coo', 'principal', 'senior manager'];
@@ -28,10 +30,10 @@ function computeMockScore(p: any): Lead {
     id: p.id || Math.random().toString(36).substr(2, 9),
     name: p.fullName || p.name || 'Unknown',
     linkedinUrl: p.url || '',
-    university: p.education?.[0]?.schoolName || 'University',
-    degree: p.education?.[0]?.degreeName || 'Master of Science',
-    fieldOfStudy: p.education?.[0]?.fieldOfStudy || 'Computer Science',
-    graduationYear: p.education?.[0]?.endDate || '2025',
+    university: p.university || 'University',
+    degree: p.degree || 'Master of Science',
+    fieldOfStudy: p.fieldOfStudy || 'Computer Science',
+    graduationYear: p.graduationYear || '2025',
     location: p.location || '',
     headline: p.headline || '',
     email: p.email || null,
@@ -40,10 +42,10 @@ function computeMockScore(p: any): Lead {
     seekingFullTime: headline.includes('full-time') || headline.includes('seeking'),
     intentScore: 2,
     qualityScore: 7,
-    outreachMessage: `Hi ${p.fullName?.split(' ')[0] || 'there'},\n\nI noticed your profile and your interest in ${(p.education?.[0]?.fieldOfStudy || 'your field')}. CareerXcelerator helps students move from role clarity to real job offers.`,
+    outreachMessage: `Hi ${p.fullName?.split(' ')[0] || 'there'},\n\nI noticed your profile and your interest in ${(p.fieldOfStudy || 'your field')}. CareerXcelerator helps students move from role clarity to real job offers.`,
     status: 'new',
     reviewFlag: 'approved',
-    qualityBreakdown: {
+    qualityBreakdown: p.qualityBreakdown || {
       indianOriginConfirmed: true,
       mastersStudent: true,
       jobSearchIntent: true,
@@ -62,17 +64,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ leads: [] });
     }
 
-    if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === '') {
+    if (!process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY === '') {
       const mockResult = profiles.map(computeMockScore);
       return NextResponse.json({ leads: mockResult });
     }
 
     try {
-      const model = genAI.getGenerativeModel({ 
-        model: 'gemini-2.0-flash',
-        generationConfig: { responseMimeType: "application/json" }
-      });
-
       const prompt = `
   Analyze these profiles for CareerXcelerator.
   Target: ${params.originCountry}, ${params.stage}, ${params.fields}.
@@ -86,7 +83,7 @@ export async function POST(req: Request) {
   Only return leads with score >= 6.
   Profiles: ${JSON.stringify(profiles)}
   
-  Respond with JSON:
+  Respond ONLY with JSON:
   {
     "leads": [
       {
@@ -107,9 +104,15 @@ export async function POST(req: Request) {
   }
   `;
 
-      const result = await model.generateContent(prompt);
-      const response = await result.response;
-      const data = JSON.parse(response.text().replace(/```json/g, '').replace(/```/g, '').trim());
+      const msg = await anthropic.messages.create({
+        model: 'claude-3-5-sonnet-20241022',
+        max_tokens: 4096,
+        messages: [{ role: 'user', content: prompt }],
+        system: "You are a lead qualification expert. You must respond in valid JSON format only."
+      });
+
+      const responseContent = msg.content[0].type === 'text' ? msg.content[0].text : '';
+      const data = JSON.parse(responseContent.replace(/```json/g, '').replace(/```/g, '').trim());
 
       const filteredLeads = (data.leads || []).filter((l: any) => {
         if (l.qualityScore < 6) return false;
@@ -121,8 +124,10 @@ export async function POST(req: Request) {
 
       return NextResponse.json({ leads: filteredLeads });
 
-    } catch (aiError) {
-      console.error('Gemini Qualify Error:', aiError);
+    } catch (aiError: any) {
+      console.error('--- CLAUDE QUALIFICATION FAILURE ---');
+      console.error('Error:', aiError.message || aiError);
+      
       return NextResponse.json({ 
         leads: profiles.slice(0, 20).map(computeMockScore),
         warning: 'Qualifying with backup logic'
