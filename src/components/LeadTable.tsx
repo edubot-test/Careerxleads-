@@ -18,7 +18,8 @@ export default function LeadTable({ leads, onExportSheets, onFeedback }: LeadTab
 
   const filteredLeads = useMemo(() => {
     return leads.filter(lead => {
-      if (filterScore !== 'all' && lead.qualityScore < parseInt(filterScore)) return false;
+      // #10: guard undefined qualityScore so filter doesn't silently pass everything
+      if (filterScore !== 'all' && (lead.qualityScore ?? 0) < parseInt(filterScore, 10)) return false;
       if (filterReview !== 'all' && lead.reviewFlag !== filterReview) return false;
       if (filterUniversity !== 'all' && lead.university !== filterUniversity) return false;
       return true;
@@ -28,7 +29,7 @@ export default function LeadTable({ leads, onExportSheets, onFeedback }: LeadTab
   const exportCSV = () => {
     const headers = ['Name', 'LinkedIn', 'University', 'Field', 'Grad Year', 'Quality Score', 'Review Needed', 'Outreach'];
     const rows = filteredLeads.map(l => [
-      `"${l.name}"`, `"${l.linkedinUrl}"`, `"${l.university}"`, `"${l.fieldOfStudy}"`, l.graduationYear, l.qualityScore, l.reviewFlag, `"${l.outreachMessage.replace(/"/g, '""')}"`
+      `"${(l.name || '').replace(/"/g, '""')}"`, `"${(l.linkedinUrl || '').replace(/"/g, '""')}"`, `"${(l.university || '').replace(/"/g, '""')}"`, `"${(l.fieldOfStudy || '').replace(/"/g, '""')}"`, l.graduationYear || '', l.qualityScore ?? '', l.reviewFlag || '', `"${(l.outreachMessage || '').replace(/"/g, '""').replace(/\n/g, ' ')}"`
     ]);
     const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv' });
@@ -103,10 +104,10 @@ export default function LeadTable({ leads, onExportSheets, onFeedback }: LeadTab
                 </td>
                 <td>
                   <div className={styles.guardrailList}>
-                    {lead.qualityBreakdown.indianOriginConfirmed && <span title="Indian Origin Confirmed">🇮🇳</span>}
-                    {lead.qualityBreakdown.mastersStudent && <span title="Masters Student">🎓</span>}
-                    {lead.qualityBreakdown.jobSearchIntent && <span title="Job Search Intent">🔎</span>}
-                    {lead.qualityBreakdown.nonTier1University && <span title="Tier 2/3/4 University">🏛️</span>}
+                    {lead.qualityBreakdown?.indianOriginConfirmed && <span title="Indian Origin Confirmed">🇮🇳</span>}
+                    {lead.qualityBreakdown?.mastersStudent && <span title="Masters Student">🎓</span>}
+                    {lead.qualityBreakdown?.jobSearchIntent && <span title="Job Search Intent">🔎</span>}
+                    {lead.qualityBreakdown?.nonTier1University && <span title="Tier 2/3/4 University">🏛️</span>}
                   </div>
                 </td>
                 <td>

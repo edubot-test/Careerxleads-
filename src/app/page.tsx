@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import GuidedFlow from '@/components/GuidedFlow';
 import LeadTable from '@/components/LeadTable';
+import ErrorBoundary from '@/components/ErrorBoundary';
 import { GenerationParams, Lead } from '@/types';
 import { FiLoader, FiCheckCircle, FiDatabase, FiTarget, FiMessageSquare, FiAlertTriangle, FiRefreshCw } from 'react-icons/fi';
 import styles from './page.module.css';
@@ -123,7 +124,9 @@ export default function Home() {
             <h1 className="text-gradient">CareerXcelerator Discovery</h1>
             <p style={{ color: 'var(--text-secondary)' }}>Identify high-intent candidates globally. Our AI browses platforms, applies strict quality guardrails, and exports vetted leads directly to your workspace.</p>
           </div>
-          <GuidedFlow onComplete={handleFlowComplete} />
+          <ErrorBoundary>
+            <GuidedFlow onComplete={handleFlowComplete} />
+          </ErrorBoundary>
         </div>
       )}
 
@@ -195,11 +198,13 @@ export default function Home() {
             </button>
           </div>
           
-          <LeadTable 
-            leads={leads} 
-            onExportSheets={handleExportSheets} 
-            onFeedback={handleLeadFeedback}
-          />
+          <ErrorBoundary>
+            <LeadTable
+              leads={leads}
+              onExportSheets={handleExportSheets}
+              onFeedback={handleLeadFeedback}
+            />
+          </ErrorBoundary>
         </div>
       )}
     </div>

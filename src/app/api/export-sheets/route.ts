@@ -9,7 +9,7 @@ export async function POST(req: Request) {
 
     if (!process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || !process.env.GOOGLE_PRIVATE_KEY || !targetSheetId) {
       console.log('No Google credentials found or Sheet ID missing.');
-      return NextResponse.json({ error: 'Configuration missing' }, { status: 500 });
+      return NextResponse.json({ error: 'Google Sheets is not configured. Set GOOGLE_SERVICE_ACCOUNT_EMAIL, GOOGLE_PRIVATE_KEY, and GOOGLE_SHEETS_ID.' }, { status: 503 });
     }
 
     const auth = new google.auth.JWT({
@@ -50,31 +50,30 @@ export async function POST(req: Request) {
       console.log(`Could not read existing leads from ${sheetName}.`);
     }
 
-    const newLeads = leads.filter((l: any) => !existingUrls.has(l.linkedinUrl.trim()));
+    const newLeads = leads.filter((l: any) => !existingUrls.has((l.linkedinUrl || '').trim()));
 
     if (newLeads.length === 0) {
       return NextResponse.json({ success: true, exportedCount: 0, message: 'No new leads to export.' });
     }
 
     const rowsToAppend = newLeads.map((l: any) => [
-      new Date().toISOString(),
-      l.name,
-      l.linkedinUrl,
-      l.university,
-      l.fieldOfStudy,
-      l.graduationYear,
-      l.email || '',
-      l.qualityScore || l.intentScore,
-      l.outreachMessage,
-      l.status,
-      l.qualityScore,
-      l.reviewFlag
+      new Date().toISOString(),          // A: Timestamp
+      l.name        || '',               // B: Name
+      l.linkedinUrl || '',               // C: LinkedIn URL
+      l.university  || '',               // D: University
+      l.fieldOfStudy || '',             // E: Field
+      l.graduationYear || '',           // F: Grad Year
+      l.email       || '',               // G: Email
+      l.qualityScore ?? l.intentScore ?? '', // H: Quality Score
+      (l.outreachMessage || '').replace(/\n/g, ' '), // I: Outreach (no newlines in Sheets)
+      l.status      || 'new',            // J: Status
+      l.reviewFlag  || 'approved',       // K: Review Flag
     ]);
 
     // ── Append to the determined sheet ──
     await sheets.spreadsheets.values.append({
       spreadsheetId: targetSheetId,
-      range: `${sheetName}!A:L`,
+      range: `${sheetName}!A:K`,
       valueInputOption: 'USER_ENTERED',
       requestBody: {
         values: rowsToAppend
@@ -85,7 +84,7 @@ export async function POST(req: Request) {
       success: true, 
       exportedCount: newLeads.length,
       totalSent: leads.length,
-      duplicatesfound: leads.length - newLeads.length
+      duplicatesFound: leads.length - newLeads.length
     });
 
   } catch (error: any) {

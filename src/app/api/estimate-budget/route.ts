@@ -5,10 +5,12 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY || '',
 });
 
+const CLAUDE_MODEL = process.env.CLAUDE_MODEL || 'claude-sonnet-4-6';
+
 export async function POST(req: Request) {
   try {
     const { params } = await req.json();
-    const leadCount = parseInt(params.leadCount) || 100;
+    const leadCount = parseInt(params.leadCount, 10) || 100;
 
     if (!process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY === '') {
       return NextResponse.json({
@@ -46,13 +48,17 @@ export async function POST(req: Request) {
       `;
 
       const msg = await anthropic.messages.create({
-        model: 'claude-3-5-sonnet-20241022',
+        model: CLAUDE_MODEL,
         max_tokens: 512,
         messages: [{ role: 'user', content: prompt }],
         system: "You are a cost estimation expert. You must respond in valid JSON format only."
       });
 
-      const responseContent = msg.content[0].type === 'text' ? msg.content[0].text : '';
+      // #14: Guard content[0] access
+      if (!msg.content?.length || msg.content[0].type !== 'text') {
+        throw new Error('Unexpected response shape from Claude');
+      }
+      const responseContent = msg.content[0].text;
       const estimate = JSON.parse(responseContent.replace(/```json/g, '').replace(/```/g, '').trim());
 
       return NextResponse.json(estimate);
@@ -70,6 +76,6 @@ export async function POST(req: Request) {
 
   } catch (error) {
     console.error('Critical Budget Estimation Error:', error);
-    return NextResponse.json({ error: 'Failed to estimate budget' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to estimate budget', details: (error as Error).message }, { status: 500 });
   }
 }

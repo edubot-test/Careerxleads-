@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import styles from './GuidedFlow.module.css';
 import { FiSend, FiArrowRight, FiCommand, FiUser, FiCheckCircle, FiDollarSign, FiInfo } from 'react-icons/fi';
 import { GenerationParams } from '@/types';
@@ -72,6 +72,8 @@ export default function GuidedFlow({ onComplete }: GuidedFlowProps) {
   ]);
   const [inputValue, setInputValue] = useState('');
   const [answers, setAnswers] = useState<Partial<GenerationParams>>({});
+  // #6: ref always holds the latest answers so handleBeginDiscovery never captures a stale closure
+  const latestAnswers = useRef<Partial<GenerationParams>>({});
   const [isGenerating, setIsGenerating] = useState(false);
   const [aiBudget, setAiBudget] = useState<{ total: number; apify: number; ai: number; complexity: string } | null>(null);
   const [isEstimating, setIsEstimating] = useState(false);
@@ -92,6 +94,7 @@ export default function GuidedFlow({ onComplete }: GuidedFlowProps) {
 
     const newAnswers = { ...answers, [currentQuestion.key]: text };
     setAnswers(newAnswers);
+    latestAnswers.current = newAnswers; // #6: keep ref in sync
 
     if (currentStep < questions.length - 1) {
       // Simulate slight delay for AI typing feel
@@ -129,8 +132,17 @@ export default function GuidedFlow({ onComplete }: GuidedFlowProps) {
         }, 1000);
       })
       .catch(err => {
+        // #12: show fallback budget and let the user proceed — estimation is not blocking
         console.error('Estimation failed:', err);
+        const count = parseInt((newAnswers.leadCount as string) || '100', 10) || 100;
+        setAiBudget({ total: count * 0.007, apify: count * 0.005, ai: count * 0.002, complexity: 'Medium' });
         setIsEstimating(false);
+        setTimeout(() => {
+          setMessages(prev => [
+            ...prev,
+            { id: (Date.now() + 2).toString(), sender: 'ai', text: "Budget estimation unavailable — using standard rates. You can still proceed with discovery." }
+          ]);
+        }, 500);
       });
     }
   };
@@ -138,7 +150,8 @@ export default function GuidedFlow({ onComplete }: GuidedFlowProps) {
   const handleBeginDiscovery = () => {
     setIsGenerating(true);
     setTimeout(() => {
-      onComplete(answers as GenerationParams);
+      // #6: use ref so this always gets the latest answers regardless of closure timing
+      onComplete(latestAnswers.current as GenerationParams);
     }, 800);
   };
 
