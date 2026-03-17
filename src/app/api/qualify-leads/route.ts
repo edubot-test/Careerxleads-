@@ -6,7 +6,6 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY || '',
 });
 
-// #24: single model constant — swap here or via env var
 const CLAUDE_MODEL = process.env.CLAUDE_MODEL || 'claude-sonnet-4-6';
 const CHUNK_SIZE = 15;
 
@@ -19,7 +18,6 @@ const LOW_RELEVANCE_FIELDS = [
   'history', 'philosophy', 'literature', 'fine arts',
   'art history', 'music', 'theater'
 ];
-// Tier-1 schools → nonTier1University = false (+0 pts), others = true (+1 pt)
 const TIER1_UNIVERSITIES = [
   'mit', 'massachusetts institute of technology', 'stanford', 'harvard',
   'carnegie mellon', 'uc berkeley', 'berkeley', 'caltech',
@@ -44,6 +42,7 @@ function isLowRelevanceField(field: string): boolean {
   return LOW_RELEVANCE_FIELDS.some(f => lc.includes(f));
 }
 
+// "Complete" for scoring purposes (all 5 fields present → +1 pt)
 function isProfileComplete(lead: any): boolean {
   return !!(
     lead.name && lead.university && lead.fieldOfStudy &&
@@ -51,12 +50,18 @@ function isProfileComplete(lead: any): boolean {
   );
 }
 
+// Minimum viability for NOT being hard-rejected — only name + a profile URL required.
+// Education fields are missing on Google/GitHub profiles by design; let the score handle it.
+function isMinimallyViable(lead: any): boolean {
+  return !!(lead.name && lead.name !== 'Unknown' && (lead.linkedinUrl || lead.url));
+}
+
 function isNonTier1University(university: string): boolean {
   const lc = (university || '').toLowerCase();
   return !TIER1_UNIVERSITIES.some(t => lc.includes(t));
 }
 
-// ── #2/#3: computeMockScore actually computes scores ─────────────────────────
+// ── Mock scorer (used when Anthropic key is absent or chunk fails) ────────────
 function computeMockScore(p: any): Lead {
   const education = p.education?.[0] || {};
   const university    = education.schoolName  || p.university    || '';
@@ -66,9 +71,10 @@ function computeMockScore(p: any): Lead {
   const headline      = (p.headline || '').toLowerCase();
   const fullName      = p.fullName || p.name || '';
 
-  // Guardrail flags
   const indianOriginConfirmed = /sharma|patel|desai|gupta|singh|kumar|mehta|joshi|kapoor|verma|reddy|rao|iyer|nair|pillai|chandra|krishna|agarwal|malhotra|bose|chatterjee|mukherjee|banerjee|das|ghosh|sen|saha|basu|dey|roy|mishra|tiwari|pandey|dubey|yadav|shukla|srivastava|tripathi|chauhan|jain|mahajan/i.test(fullName);
-  const mastersStudent        = /master|ms\b|m\.s\.|mba|m\.b\.a\.|meng|m\.eng/i.test(degree);
+  // Check both degree field AND headline/snippet — Google/GitHub profiles carry degree in headline
+  const mastersStudent        = /master|ms\b|m\.s\.|mba|m\.b\.a\.|meng|m\.eng|m\.sc/i.test(degree) ||
+                                /\bms\b|m\.s\.|master|mba|meng|m\.eng|m\.sc/i.test(headline);
   const jobSearchIntent       = /seeking|looking for|open to|internship|full.?time|job hunt|actively/i.test(headline);
   const relevantField         = !isLowRelevanceField(fieldOfStudy);
   const profileComplete       = isProfileComplete({
@@ -77,7 +83,6 @@ function computeMockScore(p: any): Lead {
   });
   const nonTier1University    = isNonTier1University(university);
 
-  // #3: 10-point scoring consistent with types/index.ts
   const qualityScore =
     (indianOriginConfirmed ? 3 : 0) +
     (mastersStudent        ? 2 : 0) +
@@ -86,11 +91,10 @@ function computeMockScore(p: any): Lead {
     (profileComplete       ? 1 : 0) +
     (nonTier1University    ? 1 : 0);
 
-  // #16: intentScore actually reflects headline signals
   const intentScore: 1 | 2 | 3 = jobSearchIntent ? 3 : mastersStudent ? 2 : 1;
 
   return {
-    id: p.id || Math.random().toString(36).substr(2, 9),
+    id: p.id || Math.random().toString(36).slice(2, 11),
     name: fullName || 'Unknown',
     linkedinUrl: p.url || p.linkedinUrl || '',
     university,
@@ -99,11 +103,11 @@ function computeMockScore(p: any): Lead {
     graduationYear,
     location: p.location || '',
     headline: p.headline || '',
-    email: p.email || null,                                   // #27: null consistently
-    socialMediaUrl: p.metadata?.actor?.includes('github') ? p.url : null,
+    email: p.email || null,
+    socialMediaUrl: p.metadata?.platform === 'GitHub' ? (p.url || null) : null,
     seekingInternship: headline.includes('intern'),
-    seekingFullTime:   (headline.includes('full-time') || headline.includes('full time') ||
-                       (headline.includes('seeking') && !headline.includes('intern'))),
+    seekingFullTime: (headline.includes('full-time') || headline.includes('full time') ||
+                     (headline.includes('seeking') && !headline.includes('intern'))),
     intentScore,
     qualityScore,
     outreachMessage: `Hi ${fullName.split(' ')[0] || 'there'},\n\nI noticed you're pursuing your ${degree || 'MS'} in ${fieldOfStudy} at ${university || 'your university'}. Many international students struggle converting applications to interviews. CareerXcelerator helps students move from role clarity to real job offers.\n\nHappy to share a few insights if helpful!`,
@@ -117,10 +121,11 @@ function computeMockScore(p: any): Lead {
       profileComplete,
       nonTier1University,
     },
+    metadata: p.metadata || undefined,
   };
 }
 
-// ── #1/#4/#3: Complete prompt with all Lead fields and exact qualityBreakdown schema ──
+// ── Prompt builder ────────────────────────────────────────────────────────────
 function buildPrompt(chunk: any[], params: any): string {
   return `You are a Lead Qualifier for CareerXcelerator, a platform helping international students land jobs in the US.
 
@@ -144,17 +149,23 @@ INTENT SCORE (1–3):
 - 1: Early stage student or clearly does not fit ICP
 
 EDUCATION EXTRACTION:
-If a profile contains an "education" array, extract from education[0] (most recent entry):
+Profiles from LinkedIn have an "education" array — use education[0] (most recent):
 - university → education[0].schoolName
 - degree → education[0].degreeName (e.g. "Master of Science")
 - fieldOfStudy → education[0].fieldOfStudy
 - graduationYear → education[0].endDate
 
+Profiles from Google/GitHub often have NO education array. For these, infer from the headline/snippet:
+- "MS Data Science @ NYU" → degree="MS", fieldOfStudy="Data Science", university="NYU"
+- "MBA Candidate at Boston University" → degree="MBA", university="Boston University"
+- "Software Engineer | MS CS @ Georgia Tech" → degree="MS", fieldOfStudy="Computer Science", university="Georgia Tech"
+- If education cannot be inferred, leave university/degree/fieldOfStudy as empty strings — do NOT reject the profile for this reason.
+
 REJECT (do not include in output) any profile where:
 - qualityScore < 6
 - headline contains senior titles (director, VP, head of, chief, CTO, CEO, principal, senior manager, or X+ years experience)
-- fieldOfStudy is irrelevant (history, philosophy, literature, fine arts, music, theater)
-- name, university, or profile URL are missing
+- fieldOfStudy is clearly irrelevant (history, philosophy, literature, fine arts, music, theater)
+- name is missing or clearly a username (e.g. "u/username", "Unknown")
 
 RAW PROFILES:
 ${JSON.stringify(chunk)}
@@ -197,19 +208,30 @@ RESPOND ONLY WITH THIS EXACT JSON (no markdown, no explanation):
 export async function POST(req: Request) {
   try {
     const { profiles, params } = await req.json();
+    const scrapedCount = (profiles || []).length;
 
     if (!profiles || profiles.length === 0) {
-      return NextResponse.json({ leads: [] });
+      return NextResponse.json({ leads: [], scrapedCount: 0, qualifiedCount: 0, rejectedCount: 0 });
     }
+
+    // Build metadata map so we can restore platform/actor info after Claude strips it
+    const profileMetaMap: Record<string, unknown> = {};
+    profiles.forEach((p: any) => { if (p.id) profileMetaMap[p.id] = p.metadata; });
 
     if (!process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY === '') {
-      // #2: Mock path now computes real scores from profile data
       const mockResult = profiles.map(computeMockScore).filter((l: Lead) => l.qualityScore >= 6);
-      return NextResponse.json({ leads: mockResult });
+      return NextResponse.json({
+        leads: mockResult,
+        isMock: true,
+        mockReason: 'ANTHROPIC_API_KEY is not set — scored locally',
+        scrapedCount,
+        qualifiedCount: mockResult.length,
+        rejectedCount: scrapedCount - mockResult.length,
+      });
     }
 
-    // #15: Chunk profiles to stay within token limits
     const allLeads: Lead[] = [];
+    let mockedChunks = 0;
 
     for (let i = 0; i < profiles.length; i += CHUNK_SIZE) {
       const chunk = profiles.slice(i, i + CHUNK_SIZE);
@@ -222,9 +244,9 @@ export async function POST(req: Request) {
           messages: [{ role: 'user', content: buildPrompt(chunk, params) }],
         });
 
-        // #14: Guard content[0] access
         if (!msg.content?.length || msg.content[0].type !== 'text') {
           console.error(`Chunk ${i / CHUNK_SIZE + 1}: unexpected response shape`);
+          mockedChunks++;
           allLeads.push(...chunk.map(computeMockScore).filter((l: Lead) => l.qualityScore >= 6));
           continue;
         }
@@ -236,30 +258,43 @@ export async function POST(req: Request) {
           data = JSON.parse(raw);
         } catch {
           console.error(`Chunk ${i / CHUNK_SIZE + 1}: Claude returned malformed JSON`);
+          mockedChunks++;
           allLeads.push(...chunk.map(computeMockScore).filter((l: Lead) => l.qualityScore >= 6));
           continue;
         }
 
-        // #17: Log post-AI filter rejections
         const preFilterCount = (data.leads || []).length;
         const filtered = (data.leads || []).filter((l: any) => {
           if ((l.qualityScore ?? 0) < 6) { console.log(`[qualify] Rejected "${l.name}" — qualityScore ${l.qualityScore} < 6`); return false; }
           if (isExperiencedProfessional(l.headline)) { console.log(`[qualify] Rejected "${l.name}" — senior professional`); return false; }
           if (isLowRelevanceField(l.fieldOfStudy))   { console.log(`[qualify] Rejected "${l.name}" — low-relevance field: ${l.fieldOfStudy}`); return false; }
-          if (!isProfileComplete(l))                 { console.log(`[qualify] Rejected "${l.name}" — incomplete profile`); return false; }
+          if (!isMinimallyViable(l))                 { console.log(`[qualify] Rejected "${l.name}" — no name or profile URL`); return false; }
           return true;
         });
 
-        console.log(`[qualify] Chunk ${i / CHUNK_SIZE + 1}: ${preFilterCount} from Claude → ${filtered.length} after guardrails`);
-        allLeads.push(...filtered);
+        // Restore metadata from original profiles — Claude strips unknown fields
+        const leadsWithMeta = filtered.map((l: any) => ({
+          ...l,
+          metadata: profileMetaMap[l.id] || undefined,
+        }));
+
+        console.log(`[qualify] Chunk ${i / CHUNK_SIZE + 1}: ${preFilterCount} from Claude → ${leadsWithMeta.length} after guardrails`);
+        allLeads.push(...leadsWithMeta);
 
       } catch (chunkError: any) {
         console.error(`Chunk ${i / CHUNK_SIZE + 1} failed:`, chunkError.message);
+        mockedChunks++;
         allLeads.push(...chunk.map(computeMockScore).filter((l: Lead) => l.qualityScore >= 6));
       }
     }
 
-    return NextResponse.json({ leads: allLeads });
+    return NextResponse.json({
+      leads: allLeads,
+      scrapedCount,
+      qualifiedCount: allLeads.length,
+      rejectedCount: scrapedCount - allLeads.length,
+      ...(mockedChunks > 0 && { partialMock: true, mockReason: `${mockedChunks} chunk(s) fell back to local scoring` }),
+    });
 
   } catch (error: any) {
     console.error('Critical qualify error:', error);

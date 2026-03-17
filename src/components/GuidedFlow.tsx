@@ -81,7 +81,10 @@ export default function GuidedFlow({ onComplete }: GuidedFlowProps) {
   const currentQuestion = questions[currentStep];
 
   const handleSend = (text: string) => {
-    if (!text.trim() && !currentQuestion?.options?.includes(text)) return;
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    // Validate: free-text questions require at least 2 characters
+    if (!currentQuestion?.options && trimmed.length < 2) return;
     
     // Add user message
     const newMessages = [
@@ -239,7 +242,7 @@ export default function GuidedFlow({ onComplete }: GuidedFlowProps) {
                     <span className="text-sm text-secondary">Examples: </span>
                     <div className={styles.exampleChips}>
                       {currentQuestion.examples.map(ex => (
-                        <button key={ex} className={styles.chip} onClick={() => setInputValue(ex)}>
+                        <button key={ex} className={styles.chip} onClick={() => handleSend(ex)}>
                           {ex}
                         </button>
                       ))}

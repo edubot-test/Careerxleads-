@@ -8,80 +8,165 @@ const anthropic = new Anthropic({
 
 const CLAUDE_MODEL = process.env.CLAUDE_MODEL || 'claude-sonnet-4-6';
 
-const ACTOR_CATALOG = {
-  LINKEDIN_CORE: 'harvestapi/linkedin-profile-search',
-  LINKEDIN_DEEP: 'logical_scrapers/linkedin-people-search-scraper',
-  GOOGLE_SEARCH: 'apify/google-search-scraper',
-  BING_SEARCH: 'tri_angle/bing-search-scraper',
-  TWITTER_SEARCH: 'apify/twitter-scraper-lite',
-  GITHUB_SEARCH: 'dtrungtin/github-users-scraper',
-  INSTAGRAM: 'apify/instagram-scraper',
-  REDDIT: 'trudax/reddit-scraper'
-};
+// ── Actor Catalog ─────────────────────────────────────────────────────────────
+// Tier 1: High-yield, identity-rich profiles — always include at least one
+// Tier 2: Strong supplemental, platform-specific context
+// Tier 3: Niche / community signals — use only when ICP calls for it
+export const ACTOR_CATALOG = {
+  LINKEDIN_CORE: {
+    id: 'harvestapi/linkedin-profile-search',
+    platform: 'LinkedIn',
+    tier: 1,
+    bestFor: ['any'],
+    inputStyle: 'linkedin_keywords',
+    description: 'Precision LinkedIn people search. Returns structured profiles with education, headline, location. Best accuracy for Indian-origin MS students.',
+  },
+  LINKEDIN_DEEP: {
+    id: 'logical_scrapers/linkedin-people-search-scraper',
+    platform: 'LinkedIn',
+    tier: 1,
+    bestFor: ['any'],
+    inputStyle: 'linkedin_keywords',
+    description: 'High-volume LinkedIn harvesting. Use instead of LINKEDIN_CORE when lead count > 100 or when broader net is needed.',
+  },
+  GOOGLE_DORK: {
+    id: 'apify/google-search-scraper',
+    platform: 'Google',
+    tier: 2,
+    bestFor: ['any'],
+    inputStyle: 'google_dork',
+    description: 'Google site: and inurl: dorks against linkedin.com/in/ and university pages. Great for catching profiles not returned by direct LinkedIn search.',
+  },
+  GITHUB: {
+    id: 'dtrungtin/github-users-scraper',
+    platform: 'GitHub',
+    tier: 2,
+    bestFor: ['software', 'engineering', 'data science', 'computer science', 'machine learning', 'ai'],
+    inputStyle: 'github_search',
+    description: 'GitHub user search by location + language. Strong signal for SWE/DS/ML students who maintain public repos.',
+  },
+  REDDIT: {
+    id: 'trudax/reddit-scraper',
+    platform: 'Reddit',
+    tier: 3,
+    bestFor: ['community', 'visa', 'career advice', 'international students'],
+    inputStyle: 'reddit_search',
+    description: 'Targets r/cscareerquestions, r/f1visa, r/gradadmissions. Catches students actively discussing job search — very high intent signal.',
+  },
+} as const;
 
+export type ActorKey = keyof typeof ACTOR_CATALOG;
+export type ActorId = typeof ACTOR_CATALOG[ActorKey]['id'];
+
+// ── Default strategy (used when ANTHROPIC_API_KEY is absent) ─────────────────
+// Platform-specific queries — NOT shared across actors
 const DEFAULT_STRATEGY = {
-  platforms: ['LinkedIn', 'Google Search', 'GitHub'],
-  searchQueries: [
-    'MS student computer science USA indian origin',
-    'site:linkedin.com/in/ "MS in Data Science" "seeking internships"',
-    'MS computer science student USA seeking internship 2025'
+  platforms: ['LinkedIn', 'Google', 'GitHub'],
+  apifyActors: [
+    ACTOR_CATALOG.LINKEDIN_CORE.id,
+    ACTOR_CATALOG.GOOGLE_DORK.id,
+    ACTOR_CATALOG.GITHUB.id,
   ],
-  apifyActors: [ACTOR_CATALOG.LINKEDIN_CORE, ACTOR_CATALOG.GOOGLE_SEARCH, ACTOR_CATALOG.GITHUB_SEARCH]
+  perActorQueries: {
+    [ACTOR_CATALOG.LINKEDIN_CORE.id]: [
+      'MS Computer Science 2025 India',
+      'Master Data Science NYU Boston University India seeking internship',
+      'MS Computer Science University Texas Dallas India open to work',
+    ],
+    [ACTOR_CATALOG.GOOGLE_DORK.id]: [
+      'site:linkedin.com/in/ "MS in Computer Science" "India" "seeking" 2025',
+      'site:linkedin.com/in/ "Master of Science" "Data Science" "open to work" India',
+      'site:linkedin.com/in/ "MS" "computer science" "University" India internship 2025',
+    ],
+    [ACTOR_CATALOG.GITHUB.id]: [
+      'location:"United States" language:Python followers:>5',
+      'location:"New York" OR location:"Boston" OR location:"San Francisco" language:Python',
+    ],
+  },
+  reasoning: 'Default: LinkedIn primary for structured profiles + Google dorks for broader LinkedIn coverage + GitHub for tech signal.',
 };
 
 export async function POST(req: Request) {
   try {
     const params = await req.json() as GenerationParams;
-    
+
     if (!process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY === '') {
-      console.log('No Anthropic API key found, returning mock strategy.');
+      console.log('[generate-strategy] No API key — using default strategy.');
       return NextResponse.json(DEFAULT_STRATEGY);
     }
 
     try {
-      const prompt = `
-        You are an elite Multi-Channel Lead Discovery Strategist for CareerXcelerator. 
-        Analyze the candidate persona:
-        - Objective: ${params.audience}
-        - Origin: ${params.originCountry}
-        - Location: ${params.currentLocation}
-        - Fields: ${params.fields}
-        
-        MULTI-CHANNEL STRATEGY RULES:
-        Always select 2–3 actors from different platforms for maximum coverage and deduplication.
+      const catalogDesc = Object.values(ACTOR_CATALOG)
+        .map(a => `  - "${a.id}" (Tier ${a.tier}, ${a.platform}): ${a.description}`)
+        .join('\n');
 
-        PLATFORM MATCHING:
-        1. All professional/academic targets: Always include LinkedIn (primary) + Google Search (broad coverage).
-        2. Software/Tech/Open Source: Add GitHub as third channel.
-        3. Creative/Design/Influencer: Replace GitHub with Instagram.
-        4. Niche Communities: Replace GitHub with Reddit.
-        5. General audience: LinkedIn + Google Search + GitHub is the safe default trio.
+      const prompt = `You are an elite Lead Discovery Strategist for CareerXcelerator, a service helping international students (primarily Indian-origin MS/MBA students) find jobs in the US.
 
-        ACTOR CATALOG (pick 2–3, from DIFFERENT platforms):
-        - "harvestapi/linkedin-profile-search": Precision LinkedIn profiles. Always include for professional targets.
-        - "logical_scrapers/linkedin-people-search-scraper": Broader LinkedIn harvesting (use instead of harvestapi when volume matters).
-        - "dtrungtin/github-users-scraper": GitHub profiles, essential for tech/SWE leads.
-        - "apify/instagram-scraper": Instagram, for creative/portfolio leads.
-        - "trudax/reddit-scraper": Reddit, for community-sourced leads.
-        - "apify/google-search-scraper": Broad web discovery, always a strong secondary actor.
+CANDIDATE PERSONA:
+- Audience: ${params.audience}
+- Origin Country: ${params.originCountry}
+- Current Location: ${params.currentLocation}
+- Fields: ${params.fields}
+- Opportunity Types: ${params.opportunityTypes}
 
-        Respond ONLY with a JSON object:
-        {
-          "platforms": ["Platform 1", "Platform 2", "Platform 3"],
-          "searchQueries": ["Optimized query 1", "query 2", "query 3"],
-          "apifyActors": ["actor-id-1", "actor-id-2", "actor-id-3"],
-          "reasoning": "Why this specific multi-channel combination was chosen"
-        }
-      `;
+YOUR JOB:
+Select 2–3 Apify actors that will yield the highest volume of RELEVANT profiles for this exact persona.
+Then generate platform-native queries for EACH actor separately — different platforms need completely different query syntax.
+
+ACTOR SELECTION RULES:
+1. Always include one Tier 1 LinkedIn actor as the primary source — LinkedIn profiles are identity-rich and structured.
+2. Always include Google Dork as a secondary — it catches LinkedIn profiles that direct search misses, and can also hit university profile pages.
+3. Add GitHub ONLY if fields include software/engineering/data science/ML/AI — it adds strong technical signal.
+4. Add Reddit ONLY if the persona is highly community-active (visa discussions, job hunt forums) — use r/cscareerquestions, r/f1visa, r/gradadmissions.
+5. Never include both LINKEDIN_CORE and LINKEDIN_DEEP — pick one based on volume needs (DEEP for >100 leads).
+6. Maximum 3 actors total.
+
+ACTOR CATALOG:
+${catalogDesc}
+
+QUERY GENERATION RULES BY PLATFORM:
+
+LinkedIn queries (inputStyle: linkedin_keywords):
+- Use natural keyword phrases: name fragments, university names, degree types, job intent signals
+- Include the origin country name and degree level
+- Examples: "MS Computer Science 2025 India", "Master Data Science NYU India open to work"
+- Generate 3–4 queries, each targeting a different angle (field, university tier, intent signal)
+
+Google queries (inputStyle: google_dork):
+- Always use site:linkedin.com/in/ as the anchor
+- Combine degree, field, origin, intent, and year signals
+- Use quotes for exact phrases
+- Examples: 'site:linkedin.com/in/ "MS in Data Science" "India" "seeking" 2025'
+- Generate 3–4 dork queries
+
+GitHub queries (inputStyle: github_search):
+- Use GitHub search syntax: location:"City" language:Python/JavaScript followers:>N
+- Target US cities with large Indian student populations (New York, Boston, San Francisco, Seattle, Austin, Atlanta)
+- Generate 2–3 queries
+
+Reddit queries (inputStyle: reddit_search):
+- Target specific subreddits: r/cscareerquestions, r/f1visa, r/gradadmissions, r/datascience
+- Use keyword searches that match job-seeking students
+- Generate 2–3 queries
+
+Respond ONLY with this exact JSON (no markdown, no explanation):
+{
+  "platforms": ["Platform1", "Platform2"],
+  "apifyActors": ["actor-id-1", "actor-id-2"],
+  "perActorQueries": {
+    "actor-id-1": ["query1", "query2", "query3"],
+    "actor-id-2": ["query1", "query2", "query3"]
+  },
+  "reasoning": "One sentence: why this actor combination and query approach for this specific persona."
+}`;
 
       const msg = await anthropic.messages.create({
         model: CLAUDE_MODEL,
         max_tokens: 1024,
+        system: 'You are a professional lead generation AI. Respond only in valid JSON.',
         messages: [{ role: 'user', content: prompt }],
-        system: "You are a professional lead generation AI. You must respond in valid JSON format only."
       });
 
-      // #14: Guard content[0] access
       if (!msg.content?.length || msg.content[0].type !== 'text') {
         throw new Error('Unexpected response shape from Claude');
       }
@@ -89,20 +174,32 @@ export async function POST(req: Request) {
       const jsonStr = msg.content[0].text.replace(/```json/g, '').replace(/```/g, '').trim();
       const strategy = JSON.parse(jsonStr);
 
-      // #18: Log reasoning so strategy choices are visible in server logs
       if (strategy.reasoning) {
         console.log('[generate-strategy] Reasoning:', strategy.reasoning);
+      }
+
+      // Validate actors are from our known catalog to prevent injection
+      const knownActorIds = Object.values(ACTOR_CATALOG).map(a => a.id);
+      strategy.apifyActors = (strategy.apifyActors || []).filter((id: string) => {
+        const known = knownActorIds.includes(id as ActorId);
+        if (!known) console.warn(`[generate-strategy] Ignoring unknown actor: ${id}`);
+        return known;
+      });
+
+      if (strategy.apifyActors.length === 0) {
+        console.warn('[generate-strategy] No valid actors after validation — using default.');
+        return NextResponse.json({ ...DEFAULT_STRATEGY, warning: 'Actor validation failed; using default strategy' });
       }
 
       return NextResponse.json(strategy);
 
     } catch (apiError: any) {
-      console.error('Anthropic API Error (generate-strategy):', apiError.message);
+      console.error('[generate-strategy] Anthropic API error:', apiError.message);
       return NextResponse.json({ ...DEFAULT_STRATEGY, warning: 'AI strategy unavailable; using default' });
     }
 
   } catch (error: any) {
-    console.error('Critical Error (generate-strategy):', error);
+    console.error('[generate-strategy] Critical error:', error);
     return NextResponse.json({ ...DEFAULT_STRATEGY, warning: 'Critical error; using default', details: error.message });
   }
 }

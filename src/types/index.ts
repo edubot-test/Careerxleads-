@@ -13,19 +13,20 @@ export interface Lead {
   seekingInternship: boolean;
   seekingFullTime: boolean;
   intentScore: number; // 1, 2, or 3
-  qualityScore: number; // 0–10 composite quality score (Guardrail 9)
+  qualityScore: number; // 0–10 composite quality score
   outreachMessage: string;
   status: 'new' | 'contacted' | 'replied' | 'call booked' | 'converted';
-  reviewFlag: 'approved' | 'review_needed'; // Guardrail 11
-  feedback?: 'good_lead' | 'irrelevant_lead' | 'converted_lead'; // Guardrail 12
+  reviewFlag: 'approved' | 'review_needed';
+  feedback?: 'good_lead' | 'irrelevant_lead' | 'converted_lead';
   qualityBreakdown: {
-    indianOriginConfirmed: boolean;   // Guardrail 2: +3
-    mastersStudent: boolean;          // Guardrail 3: +2
-    jobSearchIntent: boolean;         // Guardrail 5: +2
-    relevantField: boolean;           // Guardrail 4: +1
-    profileComplete: boolean;         // Guardrail 7: +1
-    nonTier1University: boolean;      // Guardrail 6: +1
+    indianOriginConfirmed: boolean;
+    mastersStudent: boolean;
+    jobSearchIntent: boolean;
+    relevantField: boolean;
+    profileComplete: boolean;
+    nonTier1University: boolean;
   };
+  metadata?: { platform?: string; actor?: string; [key: string]: unknown };
 }
 
 export interface GenerationParams {
@@ -36,4 +37,17 @@ export interface GenerationParams {
   fields: string;
   opportunityTypes: string;
   leadCount: string;
+}
+
+export interface PipelineStats {
+  scraped: number;
+  qualified: number;
+  rejected: number;
+}
+
+export interface SearchHistoryEntry {
+  id: string;
+  timestamp: string;
+  params: GenerationParams;
+  qualifiedCount: number;
 }
