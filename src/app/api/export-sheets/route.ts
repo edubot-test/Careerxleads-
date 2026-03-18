@@ -11,7 +11,7 @@ export async function POST(req: Request) {
     try { body = await req.json(); } catch {
       return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
     }
-    const { leads } = body ?? {};
+    const { leads, rejectedLeads } = body ?? {};
     if (!Array.isArray(leads) || leads.length === 0) {
       return NextResponse.json({ error: 'leads must be a non-empty array' }, { status: 400 });
     }
@@ -149,10 +149,11 @@ export async function POST(req: Request) {
       l.phone || '',                                  // V: Phone (WhatsApp)
     ]);
 
-    // ── Append rows ─────────────────────────────────────────────────────────
-    await sheets.spreadsheets.values.append({
+    // ── Write rows at exact position (avoids append column-offset bugs) ─────
+    const lastRow = firstNewRow + rowsToAppend.length - 1;
+    await sheets.spreadsheets.values.update({
       spreadsheetId: targetSheetId,
-      range: `${sheetName}!A:V`,
+      range: `${sheetName}!A${firstNewRow}:V${lastRow}`,
       valueInputOption: 'USER_ENTERED',
       requestBody: { values: rowsToAppend },
     });
@@ -186,11 +187,106 @@ export async function POST(req: Request) {
       });
     }
 
+    // ── Export Rejected Leads tab ────────────────────────────────────────────
+    let rejectedExportedCount = 0;
+    if (Array.isArray(rejectedLeads) && rejectedLeads.length > 0) {
+      const REJECTED_TAB = 'Rejected Leads';
+      try {
+        const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId: targetSheetId });
+        const allSheets = spreadsheet.data.sheets ?? [];
+        const rejectedSheetMeta = allSheets.find(s => s.properties?.title === REJECTED_TAB);
+        let rejectedSheetId: number;
+
+        if (!rejectedSheetMeta) {
+          // Create the tab
+          const addRes = await sheets.spreadsheets.batchUpdate({
+            spreadsheetId: targetSheetId,
+            requestBody: { requests: [{ addSheet: { properties: { title: REJECTED_TAB } } }] },
+          });
+          rejectedSheetId = addRes.data.replies?.[0]?.addSheet?.properties?.sheetId ?? 1;
+        } else {
+          rejectedSheetId = rejectedSheetMeta.properties?.sheetId ?? 1;
+        }
+
+        // Dedup against existing rejected URLs
+        const existingRejectedRes = await sheets.spreadsheets.values.get({
+          spreadsheetId: targetSheetId,
+          range: `${REJECTED_TAB}!C:C`,
+        });
+        const existingRejectedUrls = new Set(
+          (existingRejectedRes.data.values ?? []).flat().map((u: string) => normalizeUrl(u))
+        );
+
+        // Ensure header
+        const rejectedCountRes = await sheets.spreadsheets.values.get({
+          spreadsheetId: targetSheetId,
+          range: `${REJECTED_TAB}!A:A`,
+        });
+        if (!rejectedCountRes.data.values || rejectedCountRes.data.values.length === 0) {
+          await sheets.spreadsheets.values.update({
+            spreadsheetId: targetSheetId,
+            range: `${REJECTED_TAB}!A1:K1`,
+            valueInputOption: 'USER_ENTERED',
+            requestBody: {
+              values: [['Timestamp', 'Name', 'LinkedIn URL', 'University', 'Degree', 'Field Of Study', 'Graduation Year', 'Location', 'Headline', 'Platform', 'Rejection Reason']],
+            },
+          });
+        }
+
+        const seenInBatchRejected = new Set<string>();
+        const newRejected = rejectedLeads.filter((r: any) => {
+          const key = r.linkedinUrl ? normalizeUrl(r.linkedinUrl) : `${(r.name || '').toLowerCase()}|rejected`;
+          if (seenInBatchRejected.has(key) || existingRejectedUrls.has(key)) return false;
+          seenInBatchRejected.add(key);
+          return true;
+        });
+
+        if (newRejected.length > 0) {
+          const rejectedStartRow = (rejectedCountRes.data.values?.length ?? 1) + 1;
+          const rejectedLastRow = rejectedStartRow + newRejected.length - 1;
+          await sheets.spreadsheets.values.update({
+            spreadsheetId: targetSheetId,
+            range: `${REJECTED_TAB}!A${rejectedStartRow}:K${rejectedLastRow}`,
+            valueInputOption: 'USER_ENTERED',
+            requestBody: {
+              values: newRejected.map((r: any) => [
+                new Date().toISOString(),
+                r.name || '',
+                r.linkedinUrl || '',
+                r.university || '',
+                r.degree || '',
+                r.fieldOfStudy || '',
+                r.graduationYear || '',
+                r.location || '',
+                r.headline || '',
+                r.platform || '',
+                r.rejectionReason || '',
+              ]),
+            },
+          });
+
+          // Light gray background for all rejected rows (rejectedStartRow already declared above)
+          const colorReqs = newRejected.map((_: any, i: number) => ({
+            repeatCell: {
+              range: { sheetId: rejectedSheetId, startRowIndex: (rejectedStartRow - 1) + i, endRowIndex: (rejectedStartRow - 1) + i + 1, startColumnIndex: 0, endColumnIndex: 11 },
+              cell: { userEnteredFormat: { backgroundColor: { red: 0.95, green: 0.88, blue: 0.88 } } },
+              fields: 'userEnteredFormat.backgroundColor',
+            },
+          }));
+          await sheets.spreadsheets.batchUpdate({ spreadsheetId: targetSheetId, requestBody: { requests: colorReqs } });
+          rejectedExportedCount = newRejected.length;
+        }
+      } catch (e) {
+        console.error('Failed to export rejected leads tab:', e);
+      }
+    }
+
     return NextResponse.json({
       success: true,
       exportedCount: newLeads.length,
       totalSent: leads.length,
-      duplicatesFound: leads.length - newLeads.length
+      duplicatesFound: leads.length - newLeads.length,
+      rejectedExportedCount,
     });
 
   } catch (error: any) {

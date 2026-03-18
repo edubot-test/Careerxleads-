@@ -7,6 +7,7 @@ import type { SendEvent } from '@/lib/leads/scrapers';
 import { mockScore, qualifyProfiles } from '@/lib/leads/qualification';
 import { formatRejectionFeedback } from '@/lib/leads/rejection';
 import { buildAgentPrompt } from '@/lib/leads/queries';
+import { isEliteUni, SENIOR_TITLES, LOW_FIELDS } from '@/lib/leads/patterns';
 
 export const maxDuration = 60; // Vercel Hobby max (300 on Pro)
 
@@ -93,7 +94,9 @@ export async function POST(req: Request) {
       const targetCount = parseInt(params.leadCount, 10) || 50;
       const MAX_ITER    = Math.max(20, Math.ceil(targetCount / 30));
       const allLeads: any[] = [];
+      const allRejectedLeads: any[] = [];
       const seenKeys = new Set<string>();
+      const seenRejectedKeys = new Set<string>();
       let done = false;
       let iteration = 0;
 
@@ -152,6 +155,34 @@ export async function POST(req: Request) {
 
                 send('progress', { message: `Qualifying ${enriched.length} profiles from ${platform}…`, step: 'qualifying' });
                 const qualified = await qualifyProfiles(enriched, params, addTokens);
+
+                // ── Track rejected profiles ───────────────────────────────────
+                const qualifiedIds = new Set(qualified.map((l: any) => String(l.id || l.linkedinUrl || '')));
+                for (const p of enriched) {
+                  const pid = String(p.id || p.linkedinUrl || p.fullName || p.name || '');
+                  if (!pid || qualifiedIds.has(pid) || seenRejectedKeys.has(pid)) continue;
+                  seenRejectedKeys.add(pid);
+                  const uni = p.education?.[0]?.schoolName || p.university || '';
+                  const hl  = (p.headline || '').toLowerCase();
+                  const fld = p.education?.[0]?.fieldOfStudy || p.fieldOfStudy || '';
+                  let rejectionReason = 'Below quality threshold';
+                  if (isEliteUni(uni)) rejectionReason = 'Elite university';
+                  else if (SENIOR_TITLES.some((t: string) => hl.includes(t))) rejectionReason = 'Senior professional';
+                  else if (LOW_FIELDS.some((f: string) => fld.toLowerCase().includes(f))) rejectionReason = 'Irrelevant field';
+                  else if (!p.name && !p.fullName) rejectionReason = 'Incomplete profile';
+                  allRejectedLeads.push({
+                    name: p.fullName || p.name || '',
+                    linkedinUrl: p.linkedinUrl || '',
+                    university: uni,
+                    degree: p.education?.[0]?.degreeName || p.degree || '',
+                    fieldOfStudy: fld,
+                    graduationYear: (typeof p.education?.[0]?.endDate === 'object' ? p.education?.[0]?.endDate?.text : p.education?.[0]?.endDate) || p.graduationYear || '',
+                    location: p.location || '',
+                    headline: p.headline || '',
+                    platform: p.metadata?.platform || platform,
+                    rejectionReason,
+                  });
+                }
 
                 // ── Multi-key deduplication ───────────────────────────────────
                 let newCount = 0;
@@ -233,7 +264,7 @@ export async function POST(req: Request) {
         ((tokenUsage.input / 1_000_000) * 3 + (tokenUsage.output / 1_000_000) * 15).toFixed(4),
       );
       send('cost_estimate', { inputTokens: tokenUsage.input, outputTokens: tokenUsage.output, estimatedCostUsd });
-      send('complete', { leads: finalLeads, stats: finalStats });
+      send('complete', { leads: finalLeads, rejectedLeads: allRejectedLeads, stats: finalStats });
 
     } catch (err: any) {
       send('error', { message: err.message || 'Agent failed unexpectedly' });

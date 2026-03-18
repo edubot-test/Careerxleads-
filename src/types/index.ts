@@ -50,6 +50,19 @@ export interface GenerationParams {
   leadCount: string;
 }
 
+export interface RejectedLead {
+  name: string;
+  linkedinUrl: string;
+  university: string;
+  degree: string;
+  fieldOfStudy: string;
+  graduationYear: string;
+  location: string;
+  headline: string;
+  platform: string;
+  rejectionReason: string;
+}
+
 export interface PipelineStats {
   scraped: number;
   qualified: number;

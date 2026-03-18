@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import GuidedFlow from '@/components/GuidedFlow';
 import LeadTable from '@/components/LeadTable';
 import ErrorBoundary from '@/components/ErrorBoundary';
-import { GenerationParams, Lead, PipelineStats, SearchHistoryEntry } from '@/types';
+import { GenerationParams, Lead, PipelineStats, RejectedLead, SearchHistoryEntry } from '@/types';
 import { FiLoader, FiCheckCircle, FiAlertTriangle, FiRefreshCw, FiClock, FiZap, FiGlobe, FiFilter } from 'react-icons/fi';
 import styles from './page.module.css';
 
@@ -16,6 +16,7 @@ export default function Home() {
   const [agentLog, setAgentLog]         = useState<string[]>([]);
   const [activePlatform, setActivePlatform] = useState<string | null>(null);
   const [leads, setLeads]               = useState<Lead[]>([]);
+  const [rejectedLeads, setRejectedLeads] = useState<RejectedLead[]>([]);
   const [isExporting, setIsExporting]   = useState(false);
   const [exportMessage, setExportMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
@@ -124,6 +125,7 @@ export default function Home() {
               const finalLeads: Lead[] = data.leads || [];
               const pipelineStats: PipelineStats = data.stats || { scraped: finalLeads.length, qualified: finalLeads.length, rejected: 0 };
               setLeads(finalLeads);
+              setRejectedLeads(data.rejectedLeads || []);
               setStats(pipelineStats);
               if (data.isMock) setMockWarning(data.mockReason || 'Demo data shown');
 
@@ -178,17 +180,18 @@ export default function Home() {
       const res = await fetch('/api/export-sheets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ leads: filteredLeads }),
+        body: JSON.stringify({ leads: filteredLeads, rejectedLeads }),
       });
       const data = await res.json();
       if (res.ok) {
         let msg: string;
+        const rejNote = data.rejectedExportedCount > 0 ? ` · ${data.rejectedExportedCount} rejected → "Rejected Leads" tab` : '';
         if (data.exportedCount === 0) {
-          msg = 'All leads already in sheet — nothing new to export';
+          msg = `All leads already in sheet — nothing new to export${rejNote}`;
         } else if (data.duplicatesFound > 0) {
-          msg = `Exported ${data.exportedCount} leads (${data.duplicatesFound} already in sheet)`;
+          msg = `Exported ${data.exportedCount} leads (${data.duplicatesFound} already in sheet)${rejNote}`;
         } else {
-          msg = `Exported ${data.exportedCount} leads to Google Sheets`;
+          msg = `Exported ${data.exportedCount} leads to Google Sheets${rejNote}`;
         }
         setExportMessage(msg);
         setTimeout(() => setExportMessage(null), 4000);
