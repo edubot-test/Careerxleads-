@@ -9,6 +9,7 @@ export interface Lead {
   location: string;
   headline: string;
   email: string | null;
+  phone: string | null;           // extracted from PDF resume snippet or GitHub README
   socialMediaUrl: string | null;
   seekingInternship: boolean;
   seekingFullTime: boolean;
@@ -19,6 +20,12 @@ export interface Lead {
   status: 'new' | 'contacted' | 'replied' | 'call booked' | 'converted';
   reviewFlag: 'approved' | 'review_needed';
   feedback?: 'good_lead' | 'irrelevant_lead' | 'converted_lead';
+  struggleScore?: number;      // 0–10: profile-gap signals (grad gap, no internship, visa, thin profile)
+  universityTier?: 2 | 3 | 4; // 2=mid-tier target, 3=prime regional, 4=ultra-prime small (1=elite → rejected)
+  networkingScore?: number;    // 0–10: product-company network exposure (low = service-company trap)
+  optDaysRemaining?: number;   // days until 90-day OPT unemployment limit (set when < 90 days post-grad)
+  detectedLanguage?: string;   // first Indian language detected (Telugu/Tamil/etc.) for regional outreach
+  regionalTag?: string;        // highest-confidence region via 4-signal combinator (undergrad uni > lang > org > surname)
   qualityBreakdown: {
     indianOriginConfirmed: boolean;
     mastersStudent: boolean;

@@ -56,8 +56,8 @@ const questions: Question[] = [
   },
   {
     key: 'leadCount',
-    text: 'How many vetted leads (meeting quality score ≥6) should the agent find?',
-    examples: ['100', '250', '500', '1000']
+    text: 'How many vetted leads (meeting quality score ≥6) should the agent find? (max 100 per run)',
+    examples: ['25', '50', '75', '100']
   }
 ];
 
@@ -95,7 +95,11 @@ export default function GuidedFlow({ onComplete }: GuidedFlowProps) {
     setMessages(newMessages);
     setInputValue('');
 
-    const newAnswers = { ...answers, [currentQuestion.key]: text };
+    // Clamp leadCount to 100 max
+    const value = currentQuestion.key === 'leadCount'
+      ? String(Math.min(100, Math.max(1, parseInt(text.match(/\d+/)?.[0] || '50', 10) || 50)))
+      : text;
+    const newAnswers = { ...answers, [currentQuestion.key]: value };
     setAnswers(newAnswers);
     latestAnswers.current = newAnswers; // #6: keep ref in sync
 

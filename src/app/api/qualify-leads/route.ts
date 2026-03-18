@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { Lead } from '@/types';
 
+export const maxDuration = 120; // 2 min — Claude batch qualification
+
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY || '',
 });
@@ -104,6 +106,7 @@ function computeMockScore(p: any): Lead {
     location: p.location || '',
     headline: p.headline || '',
     email: p.email || null,
+    phone: p.phone || null,
     socialMediaUrl: p.metadata?.platform === 'GitHub' ? (p.url || null) : null,
     seekingInternship: headline.includes('intern'),
     seekingFullTime: (headline.includes('full-time') || headline.includes('full time') ||

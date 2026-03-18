@@ -152,11 +152,12 @@ export default function LeadTable({
 
   const exportCSV = () => {
     const headers = [
-      'Timestamp', 'Full Name', 'LinkedIn URL', 'University', 'Degree', 'Field Of Study', 
-      'Graduation Year', 'Location', 'Headline', 'Email', 'Seeking Internship', 
-      'Seeking Full Time', 'Intent Score', 'Priority', 'Outreach Message', 'Status'
+      'Timestamp', 'Full Name', 'LinkedIn URL', 'University', 'Degree', 'Field Of Study',
+      'Graduation Year', 'Location', 'Headline', 'Email', 'Seeking Internship',
+      'Seeking Full Time', 'Intent Score', 'Priority', 'Outreach Message', 'Status',
+      'Struggle Score', 'Uni Tier', 'Networking Score', 'OPT Days Remaining', 'Regional Tag', 'Phone',
     ];
-    
+
     const rows = filteredLeads.map(l => {
       const msg = editedMessages[l.id] ?? l.outreachMessage;
       return [
@@ -165,7 +166,7 @@ export default function LeadTable({
         `"${(l.linkedinUrl || '').replace(/"/g, '""')}"`,            // C: LinkedIn URL
         `"${(l.university || '').replace(/"/g, '""')}"`,             // D: University
         `"${(l.degree || '').replace(/"/g, '""')}"`,                 // E: Degree
-        `"${(l.fieldOfStudy || '').replace(/"/g, '""')}"`,          // F: Field Of Study
+        `"${(l.fieldOfStudy || '').replace(/"/g, '""')}"`,           // F: Field Of Study
         `"${(l.graduationYear || '').replace(/"/g, '""')}"`,         // G: Graduation Year
         `"${(l.location || '').replace(/"/g, '""')}"`,               // H: Location
         `"${(l.headline || '').replace(/"/g, '""')}"`,               // I: Headline
@@ -176,6 +177,12 @@ export default function LeadTable({
         l.tier ? TIER_META[l.tier as 1|2|3]?.label ?? '' : '',      // N: Priority
         `"${(msg || '').replace(/"/g, '""').replace(/\n/g, ' ')}"`,  // O: Outreach Message
         l.status || 'new',                                           // P: Status
+        l.struggleScore   ?? '',                                     // Q: Struggle Score
+        l.universityTier  ?? '',                                     // R: Uni Tier
+        l.networkingScore ?? '',                                     // S: Networking Score
+        l.optDaysRemaining ?? '',                                    // T: OPT Days Remaining
+        (l.regionalTag || l.detectedLanguage) ?? '',                 // U: Regional Tag
+        l.phone ?? '',                                               // V: Phone (WhatsApp)
       ];
     });
     
@@ -416,8 +423,20 @@ export default function LeadTable({
                           {lead.qualityBreakdown?.indianOriginConfirmed && <span title="Indian Origin">🇮🇳</span>}
                           {lead.qualityBreakdown?.mastersStudent         && <span title="Masters Student">🎓</span>}
                           {lead.qualityBreakdown?.jobSearchIntent        && <span title="Job Search Intent">🔎</span>}
-                          {lead.qualityBreakdown?.nonTier1University     && <span title="Non-Tier 1 Uni">🏛️</span>}
+                          {(lead.struggleScore ?? 0) >= 6               && <span title={`Struggle Score: ${lead.struggleScore}/10 — high-pain lead`}>🔥</span>}
+                          {lead.universityTier === 3                    && <span title="Tier 3 university (prime target)">🏛</span>}
+                          {lead.universityTier === 4                    && <span title="Tier 4 university (ultra-prime — rarely recruited)">⭐</span>}
+                          {lead.networkingScore !== undefined && lead.networkingScore <= 4 && <span title={`Networking Score: ${lead.networkingScore}/10 — service-company trap, insular network`}>🕸</span>}
+                          {(lead.regionalTag || lead.detectedLanguage)  && <span title={`Regional: ${lead.regionalTag || lead.detectedLanguage}`}>🗣</span>}
                         </div>
+                        {lead.optDaysRemaining !== undefined && lead.optDaysRemaining <= 30 && (
+                          <div style={{ marginTop: '4px' }}>
+                            <span title={`~${lead.optDaysRemaining} days left on OPT unemployment clock`}
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.04em', color: '#dc2626', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: '4px', padding: '1px 5px', animation: 'pulse 1.5s ease-in-out infinite' }}>
+                              🚨 URGENT · {lead.optDaysRemaining}d OPT
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </td>
 
@@ -443,7 +462,7 @@ export default function LeadTable({
                       </select>
                     </td>
 
-                    {/* Email */}
+                    {/* Email + Phone */}
                     <td>
                       {lead.email ? (
                         <div className={styles.emailCell}>
@@ -453,6 +472,14 @@ export default function LeadTable({
                           </button>
                         </div>
                       ) : <span className={styles.emptyDash}>—</span>}
+                      {lead.phone && (
+                        <div className={styles.emailCell} style={{ marginTop: '3px' }}>
+                          <span className={styles.emailText} style={{ color: '#16a34a', fontSize: '0.72rem' }}>📱 {lead.phone}</span>
+                          <button className={styles.copyBtn} onClick={() => { navigator.clipboard.writeText(lead.phone!); }} title="Copy phone / WhatsApp">
+                            <FiCopy size={11} />
+                          </button>
+                        </div>
+                      )}
                     </td>
 
                     {/* Feedback */}
@@ -679,6 +706,26 @@ function Drawer({ lead, editedMessages, onClose, onEdit, onReset, onStatusChange
           />
         </div>
 
+        {(lead.email || lead.phone) && (
+          <div className={styles.drawerSection}>
+            <span className={styles.drawerSectionLabel}>Contact</span>
+            <div style={{ marginTop: '0.4rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+              {lead.email && (
+                <div className={styles.emailCell}>
+                  <span className={styles.emailText}>{lead.email}</span>
+                  <button className={styles.copyBtn} onClick={() => navigator.clipboard.writeText(lead.email!)} title="Copy email"><FiCopy size={11} /></button>
+                </div>
+              )}
+              {lead.phone && (
+                <div className={styles.emailCell}>
+                  <span className={styles.emailText} style={{ color: '#16a34a' }}>📱 {lead.phone}</span>
+                  <button className={styles.copyBtn} onClick={() => navigator.clipboard.writeText(lead.phone!)} title="Copy WhatsApp / phone"><FiCopy size={11} /></button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         <div className={styles.drawerSection}>
           <span className={styles.drawerSectionLabel}>Status</span>
           <select
@@ -705,10 +752,34 @@ function Drawer({ lead, editedMessages, onClose, onEdit, onReset, onStatusChange
 
         <div className={styles.drawerSection}>
           <span className={styles.drawerSectionLabel}>Review</span>
-          <div style={{ marginTop: '0.5rem' }}>
+          <div style={{ marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
             {lead.reviewFlag === 'review_needed'
               ? <span className={styles.reviewBadge}><FiAlertCircle size={11} /> Needs Review</span>
               : <span className={styles.approvedBadge}><FiCheck size={11} /> Approved</span>}
+            {lead.optDaysRemaining !== undefined && lead.optDaysRemaining <= 30 && (
+              <span title={`~${lead.optDaysRemaining} days remaining on 90-day OPT unemployment clock — contact TODAY`}
+                style={{ fontSize: '0.72rem', fontWeight: 700, color: '#dc2626', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: '4px', padding: '2px 7px' }}>
+                🚨 URGENT — {lead.optDaysRemaining}d OPT left
+              </span>
+            )}
+            {lead.struggleScore !== undefined && (
+              <span title="Struggle Score: profile-gap signals (grad gap, no internship, visa struggle, thin profile)"
+                style={{ fontSize: '0.72rem', fontWeight: 600, color: (lead.struggleScore ?? 0) >= 6 ? '#dc2626' : '#d97706', background: (lead.struggleScore ?? 0) >= 6 ? '#fef2f2' : '#fffbeb', border: `1px solid ${(lead.struggleScore ?? 0) >= 6 ? '#fca5a5' : '#fde68a'}`, borderRadius: '4px', padding: '2px 7px' }}>
+                🔥 Struggle {lead.struggleScore}/10{lead.universityTier && ` · Uni T${lead.universityTier}`}
+              </span>
+            )}
+            {lead.networkingScore !== undefined && lead.networkingScore <= 4 && (
+              <span title={`Networking Score: ${lead.networkingScore}/10 — service-company trap. Insular Desi network, no product-company exposure. CareerX is their only bridge.`}
+                style={{ fontSize: '0.72rem', fontWeight: 600, color: '#7c3aed', background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: '4px', padding: '2px 7px' }}>
+                🕸 Network Trap {lead.networkingScore}/10
+              </span>
+            )}
+            {(lead.regionalTag || lead.detectedLanguage) && (
+              <span title={`Regional tag: ${lead.regionalTag || lead.detectedLanguage} (via 4-signal combinator: undergrad uni > language > org > surname). Regional anchor included in outreach.`}
+                style={{ fontSize: '0.72rem', fontWeight: 600, color: '#0369a1', background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '4px', padding: '2px 7px' }}>
+                🗣 {lead.regionalTag || lead.detectedLanguage}
+              </span>
+            )}
           </div>
         </div>
       </div>

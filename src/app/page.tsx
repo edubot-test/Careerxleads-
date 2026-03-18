@@ -117,6 +117,8 @@ export default function Home() {
               addLog(`Searching ${data.platform}…`);
             } else if (event === 'tool_done') {
               addLog(`${data.platform}: ${data.qualifiedNew} new leads (total ${data.totalQualified})`);
+            } else if (event === 'cost_estimate') {
+              addLog(`Tokens: ${data.inputTokens.toLocaleString()} in / ${data.outputTokens.toLocaleString()} out · ~$${data.estimatedCostUsd} est.`);
             } else if (event === 'complete') {
               stopTimer();
               const finalLeads: Lead[] = data.leads || [];
@@ -142,7 +144,8 @@ export default function Home() {
               throw new Error(data.message || 'Agent error');
             }
           } catch (parseErr: any) {
-            if (parseErr.message?.includes('Agent')) throw parseErr;
+            // Re-throw real errors (from event === 'error' handler), ignore JSON parse noise
+            if (parseErr instanceof Error) throw parseErr;
           }
         }
       }
@@ -156,6 +159,16 @@ export default function Home() {
   // ── Handlers ──────────────────────────────────────────────────────────────
   const handleStatusChange = (leadId: string, status: Lead['status']) => {
     setLeads(prev => prev.map(l => l.id === leadId ? { ...l, status } : l));
+    if (status === 'contacted') {
+      const lead = leads.find(l => l.id === leadId);
+      if (lead) {
+        fetch('/api/export-sheets', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ leads: [{ ...lead, status }] }),
+        }).catch(e => console.error('Auto-sheet push failed:', e));
+      }
+    }
   };
 
   const handleExportSheets = async (filteredLeads: Lead[]) => {

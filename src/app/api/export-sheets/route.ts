@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { google } from 'googleapis';
 
+export const maxDuration = 60; // 1 min — Sheets API writes
+
 const targetSheetId = process.env.GOOGLE_SHEETS_ID;
 
 export async function POST(req: Request) {
@@ -104,14 +106,15 @@ export async function POST(req: Request) {
         // Sheet empty, write headers
         await sheets.spreadsheets.values.update({
           spreadsheetId: targetSheetId,
-          range: `${sheetName}!A1:P1`,
+          range: `${sheetName}!A1:V1`,
           valueInputOption: 'USER_ENTERED',
           requestBody: {
             values: [[
-              'Timestamp', 'Full Name', 'LinkedIn URL', 'University', 'Degree', 
-              'Field Of Study', 'Graduation Year', 'Location', 'Headline', 'Email', 
-              'Seeking Internship', 'Seeking Full Time', 'Intent Score', 'Priority', 
-              'Outreach Message', 'Status'
+              'Timestamp', 'Full Name', 'LinkedIn URL', 'University', 'Degree',
+              'Field Of Study', 'Graduation Year', 'Location', 'Headline', 'Email',
+              'Seeking Internship', 'Seeking Full Time', 'Intent Score', 'Priority',
+              'Outreach Message', 'Status',
+              'Struggle Score', 'Uni Tier', 'Networking Score', 'OPT Days Remaining', 'Regional Tag', 'Phone',
             ]],
           },
         });
@@ -138,12 +141,18 @@ export async function POST(req: Request) {
       ({ 1: 'Hot', 2: 'Warm', 3: 'Cold' } as Record<number,string>)[l.tier] ?? '', // N: Priority
       (l.outreachMessage || '').replace(/\n/g, ' '), // O: Outreach Message
       l.status      || 'new',                         // P: Status
+      l.struggleScore      ?? '',                     // Q: Struggle Score
+      l.universityTier     ?? '',                     // R: Uni Tier
+      l.networkingScore    ?? '',                     // S: Networking Score
+      l.optDaysRemaining   ?? '',                     // T: OPT Days Remaining
+      l.regionalTag || l.detectedLanguage || '',      // U: Regional Tag
+      l.phone || '',                                  // V: Phone (WhatsApp)
     ]);
 
     // ── Append rows ─────────────────────────────────────────────────────────
     await sheets.spreadsheets.values.append({
       spreadsheetId: targetSheetId,
-      range: `${sheetName}!A:P`,
+      range: `${sheetName}!A:V`,
       valueInputOption: 'USER_ENTERED',
       requestBody: { values: rowsToAppend },
     });
@@ -163,7 +172,7 @@ export async function POST(req: Request) {
       const rowIndex = firstNewRow - 1 + i; // 0-based
       return {
         repeatCell: {
-          range: { sheetId, startRowIndex: rowIndex, endRowIndex: rowIndex + 1, startColumnIndex: 0, endColumnIndex: 16 },
+          range: { sheetId, startRowIndex: rowIndex, endRowIndex: rowIndex + 1, startColumnIndex: 0, endColumnIndex: 22 },
           cell: { userEnteredFormat: { backgroundColor: color } },
           fields: 'userEnteredFormat.backgroundColor',
         },
