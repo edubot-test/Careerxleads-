@@ -42,24 +42,55 @@ export async function POST(req: Request) {
       console.error('Error fetching spreadsheet info:', e);
     }
 
-    // ── Guardrail 8: Duplicate Prevention ──
-    let existingUrls = new Set<string>();
-    try {
-      const response = await sheets.spreadsheets.values.get({
-        spreadsheetId: targetSheetId,
-        range: `${sheetName}!C:C`, 
-      });
-      const rows = response.data.values;
-      if (rows) {
-        rows.flat().forEach(url => {
-          if (url) existingUrls.add(url.toString().trim());
-        });
+    // ── Duplicate Prevention ────────────────────────────────────────────────
+    // Normalise a LinkedIn URL to a canonical form so minor variations
+    // (trailing slash, query strings, http vs https, www prefix, case) don't
+    // fool the check.
+    function normalizeUrl(raw: string): string {
+      try {
+        const u = new URL(raw.trim().toLowerCase().replace(/^http:\/\//, 'https://'));
+        // Strip query params and hash; remove trailing slash from pathname
+        return `${u.hostname.replace(/^www\./, '')}${u.pathname.replace(/\/$/, '')}`;
+      } catch {
+        return raw.trim().toLowerCase().replace(/\/$/, '');
       }
-    } catch (e) {
-      console.log(`Could not read existing leads from ${sheetName}.`);
+    }
+    // Fallback fingerprint when URL is absent: "name|university" lowercased
+    function fallbackKey(l: any): string {
+      return `${(l.name || '').toLowerCase().trim()}|${(l.university || '').toLowerCase().trim()}`;
     }
 
-    const newLeads = leads.filter((l: any) => !existingUrls.has((l.linkedinUrl || '').trim()));
+    const existingUrlKeys  = new Set<string>();
+    const existingNameKeys = new Set<string>();
+    try {
+      // Read columns B (Full Name) and C (LinkedIn URL) together
+      const response = await sheets.spreadsheets.values.get({
+        spreadsheetId: targetSheetId,
+        range: `${sheetName}!B:C`,
+      });
+      const rows = response.data.values ?? [];
+      for (const [name, url] of rows) {
+        if (url) existingUrlKeys.add(normalizeUrl(url));
+        if (name && !url) existingNameKeys.add(`${(name as string).toLowerCase().trim()}|`);
+      }
+    } catch (e) {
+      console.log(`Could not read existing leads from ${sheetName}. Proceeding without dedup.`);
+    }
+
+    // Also dedup within the incoming batch itself (prevent double-export of same lead)
+    const seenInBatch = new Set<string>();
+    const newLeads = leads.filter((l: any) => {
+      const urlKey  = l.linkedinUrl ? normalizeUrl(l.linkedinUrl) : '';
+      const nameKey = fallbackKey(l);
+      const batchKey = urlKey || nameKey;
+
+      if (seenInBatch.has(batchKey)) return false;
+      seenInBatch.add(batchKey);
+
+      if (urlKey && existingUrlKeys.has(urlKey)) return false;
+      if (!urlKey && existingNameKeys.has(nameKey)) return false;
+      return true;
+    });
 
     if (newLeads.length === 0) {
       return NextResponse.json({ success: true, exportedCount: 0, message: 'No new leads to export.' });
