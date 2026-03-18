@@ -19,7 +19,7 @@ export const ACTOR_CATALOG = {
     tier: 1,
     bestFor: ['any'],
     inputStyle: 'linkedin_keywords',
-    description: 'Precision LinkedIn people search. Returns structured profiles with education, headline, location. Best accuracy for Indian-origin MS students.',
+    description: 'Step 1 of LinkedIn pipeline — people search by keyword. Input: queries array of {searchQuery} objects. Returns basic profiles with URLs. Automatically followed by linkedin-profile-scraper (Step 2) to get full education data.',
   },
   LINKEDIN_DEEP: {
     id: 'logical_scrapers/linkedin-people-search-scraper',
@@ -27,7 +27,7 @@ export const ACTOR_CATALOG = {
     tier: 1,
     bestFor: ['any'],
     inputStyle: 'linkedin_keywords',
-    description: 'High-volume LinkedIn harvesting. Use instead of LINKEDIN_CORE when lead count > 100 or when broader net is needed.',
+    description: 'Alternative LinkedIn search. Use instead of LINKEDIN_CORE when lead count > 100 or when broader net is needed.',
   },
   GOOGLE_DORK: {
     id: 'apify/google-search-scraper',
@@ -68,22 +68,26 @@ const DEFAULT_STRATEGY = {
     ACTOR_CATALOG.GITHUB.id,
   ],
   perActorQueries: {
+    // LinkedIn queries: plain keyword strings — scrape-leads wraps these into {searchQuery: q} objects
     [ACTOR_CATALOG.LINKEDIN_CORE.id]: [
-      'MS Computer Science 2025 India',
-      'Master Data Science NYU Boston University India seeking internship',
-      'MS Computer Science University Texas Dallas India open to work',
+      'MS Computer Science 2025 India seeking internship',
+      'Master Data Science India open to work United States',
+      'MS Computer Science India University Texas Dallas Boston NYU',
+      'MBA India international student seeking full time 2025',
     ],
+    // Google dork queries: site:linkedin.com/in/ format for catching profiles direct search misses
     [ACTOR_CATALOG.GOOGLE_DORK.id]: [
       'site:linkedin.com/in/ "MS in Computer Science" "India" "seeking" 2025',
       'site:linkedin.com/in/ "Master of Science" "Data Science" "open to work" India',
       'site:linkedin.com/in/ "MS" "computer science" "University" India internship 2025',
     ],
+    // GitHub queries: location + language syntax
     [ACTOR_CATALOG.GITHUB.id]: [
       'location:"United States" language:Python followers:>5',
       'location:"New York" OR location:"Boston" OR location:"San Francisco" language:Python',
     ],
   },
-  reasoning: 'Default: LinkedIn primary for structured profiles + Google dorks for broader LinkedIn coverage + GitHub for tech signal.',
+  reasoning: 'Default: LinkedIn 2-step pipeline (search → full scrape) for structured profiles with education + Google dorks for broader coverage + GitHub for tech signal.',
 };
 
 export async function POST(req: Request) {
@@ -127,10 +131,11 @@ ${catalogDesc}
 QUERY GENERATION RULES BY PLATFORM:
 
 LinkedIn queries (inputStyle: linkedin_keywords):
-- Use natural keyword phrases: name fragments, university names, degree types, job intent signals
+- These are plain keyword strings. The app automatically wraps them into {searchQuery: "..."} objects for the actor.
+- Use natural keyword phrases: degree type, field, origin country, job intent, location
 - Include the origin country name and degree level
-- Examples: "MS Computer Science 2025 India", "Master Data Science NYU India open to work"
-- Generate 3–4 queries, each targeting a different angle (field, university tier, intent signal)
+- Examples: "MS Computer Science 2025 India seeking internship", "Master Data Science India open to work United States"
+- Generate 3–4 queries, each targeting a different angle (field, university tier, intent signal, graduation year)
 
 Google queries (inputStyle: google_dork):
 - Always use site:linkedin.com/in/ as the anchor

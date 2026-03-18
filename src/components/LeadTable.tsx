@@ -1,12 +1,15 @@
 'use client';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import styles from './LeadTable.module.css';
 import { Lead, PipelineStats } from '@/types';
 import {
   FiDownload, FiShare2, FiExternalLink, FiAlertCircle, FiCheck,
   FiThumbsUp, FiThumbsDown, FiUserCheck, FiSearch,
   FiChevronUp, FiChevronDown, FiCopy, FiBarChart2, FiX,
+  FiChevronLeft, FiChevronRight,
 } from 'react-icons/fi';
+
+const PAGE_SIZE = 50;
 
 interface LeadTableProps {
   leads: Lead[];
@@ -16,6 +19,12 @@ interface LeadTableProps {
   isExporting?: boolean;
   stats?: PipelineStats;
 }
+
+const TIER_META: Record<1 | 2 | 3, { label: string; color: string; bg: string; title: string }> = {
+  1: { label: 'T1', color: '#dc2626', bg: '#fef2f2', title: 'Hot lead (score≥8 + high intent)' },
+  2: { label: 'T2', color: '#d97706', bg: '#fffbeb', title: 'Warm lead (score 6-7 or intent≥2)' },
+  3: { label: 'T3', color: '#64748b', bg: '#f8fafc', title: 'Cold lead (score 5-6)' },
+};
 
 const PLATFORM_META: Record<string, { label: string; color: string }> = {
   LinkedIn: { label: 'LI', color: '#0a66c2' },
@@ -39,6 +48,7 @@ export default function LeadTable({
   leads, onExportSheets, onFeedback, onStatusChange, isExporting = false, stats,
 }: LeadTableProps) {
   const [minScore, setMinScore]           = useState(6);
+  const [filterTier, setFilterTier]       = useState<'all' | '1' | '2' | '3'>('all');
   const [filterReview, setFilterReview]   = useState('all');
   const [filterUniversity, setFilterUniversity] = useState('all');
   const [filterPlatform, setFilterPlatform]     = useState('all');
@@ -50,6 +60,7 @@ export default function LeadTable({
   const [expandedOutreach, setExpandedOutreach] = useState<string | null>(null);
   const [copiedId, setCopiedId]           = useState<string | null>(null);
   const [showAnalytics, setShowAnalytics] = useState(false);
+  const [page, setPage] = useState(0);
 
   const universities = useMemo(
     () => Array.from(new Set(leads.map(l => l.university).filter(Boolean))).sort(),
@@ -63,6 +74,7 @@ export default function LeadTable({
   const filteredLeads = useMemo(() => {
     const result = leads.filter(lead => {
       if ((lead.qualityScore ?? 0) < minScore) return false;
+      if (filterTier !== 'all' && (lead.tier == null || lead.tier !== Number(filterTier))) return false;
       if (filterReview !== 'all' && lead.reviewFlag !== filterReview) return false;
       if (filterUniversity !== 'all' && lead.university !== filterUniversity) return false;
       if (filterPlatform !== 'all' && lead.metadata?.platform !== filterPlatform) return false;
@@ -79,7 +91,13 @@ export default function LeadTable({
       return av > bv ? 1 : av < bv ? -1 : 0;
     });
     return result;
-  }, [leads, minScore, filterReview, filterUniversity, filterPlatform, searchName, sortBy, sortDir]);
+  }, [leads, minScore, filterTier, filterReview, filterUniversity, filterPlatform, searchName, sortBy, sortDir]);
+
+  // Reset to first page whenever filtered set changes
+  useEffect(() => { setPage(0); }, [filteredLeads]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredLeads.length / PAGE_SIZE));
+  const pagedLeads = filteredLeads.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
   // Analytics data
   const analytics = useMemo(() => {
@@ -127,27 +145,34 @@ export default function LeadTable({
   };
 
   const exportCSV = () => {
-    const headers = ['Name', 'LinkedIn', 'University', 'Degree', 'Field', 'Grad Year', 'Email', 'Platform', 'Quality Score', 'Intent Score', 'Seeking Internship', 'Seeking Full-time', 'Status', 'Review Flag', 'Outreach'];
+    const headers = [
+      'Timestamp', 'Full Name', 'LinkedIn URL', 'University', 'Degree', 'Field Of Study', 
+      'Graduation Year', 'Location', 'Headline', 'Email', 'Seeking Internship', 
+      'Seeking Full Time', 'Intent Score', 'Priority', 'Outreach Message', 'Status'
+    ];
+    
     const rows = filteredLeads.map(l => {
       const msg = editedMessages[l.id] ?? l.outreachMessage;
       return [
-        `"${(l.name || '').replace(/"/g, '""')}"`,
-        `"${(l.linkedinUrl || '').replace(/"/g, '""')}"`,
-        `"${(l.university || '').replace(/"/g, '""')}"`,
-        `"${(l.degree || '').replace(/"/g, '""')}"`,
-        `"${(l.fieldOfStudy || '').replace(/"/g, '""')}"`,
-        l.graduationYear || '',
-        l.email || '',
-        (l.metadata?.platform as string) || '',
-        l.qualityScore ?? '',
-        l.intentScore ?? '',
-        l.seekingInternship ? 'Yes' : 'No',
-        l.seekingFullTime ? 'Yes' : 'No',
-        l.status || 'new',
-        l.reviewFlag || '',
-        `"${(msg || '').replace(/"/g, '""').replace(/\n/g, ' ')}"`,
+        `"${new Date().toISOString()}"`,                             // A: Timestamp
+        `"${(l.name || '').replace(/"/g, '""')}"`,                   // B: Full Name
+        `"${(l.linkedinUrl || '').replace(/"/g, '""')}"`,            // C: LinkedIn URL
+        `"${(l.university || '').replace(/"/g, '""')}"`,             // D: University
+        `"${(l.degree || '').replace(/"/g, '""')}"`,                 // E: Degree
+        `"${(l.fieldOfStudy || '').replace(/"/g, '""')}"`,          // F: Field Of Study
+        `"${(l.graduationYear || '').replace(/"/g, '""')}"`,         // G: Graduation Year
+        `"${(l.location || '').replace(/"/g, '""')}"`,               // H: Location
+        `"${(l.headline || '').replace(/"/g, '""')}"`,               // I: Headline
+        `"${(l.email || '').replace(/"/g, '""')}"`,                  // J: Email
+        l.seekingInternship ? 'Yes' : 'No',                          // K: Seeking Internship
+        l.seekingFullTime ? 'Yes' : 'No',                            // L: Seeking Full Time
+        l.intentScore ?? '',                                         // M: Intent Score
+        l.tier ?? '',                                                // N: Priority
+        `"${(msg || '').replace(/"/g, '""').replace(/\n/g, ' ')}"`,  // O: Outreach Message
+        l.status || 'new',                                           // P: Status
       ];
     });
+    
     const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
     const a = document.createElement('a'); a.href = url; a.download = 'careerx_leads.csv'; a.click();
@@ -211,6 +236,12 @@ export default function LeadTable({
             <input type="range" min={1} max={10} value={minScore}
               onChange={e => setMinScore(Number(e.target.value))} className={styles.scoreSlider} />
           </div>
+          <select className="input-field" value={filterTier} onChange={e => setFilterTier(e.target.value as 'all' | '1' | '2' | '3')}>
+            <option value="all">All Tiers</option>
+            <option value="1">T1 — Hot</option>
+            <option value="2">T2 — Warm</option>
+            <option value="3">T3 — Cold</option>
+          </select>
           <select className="input-field" value={filterReview} onChange={e => setFilterReview(e.target.value)}>
             <option value="all">Any Review</option>
             <option value="approved">Approved</option>
@@ -248,7 +279,7 @@ export default function LeadTable({
             <FiSearch size={32} style={{ opacity: 0.25, marginBottom: '0.75rem' }} />
             <p>No leads match the current filters.</p>
             <button className="btn btn-secondary" style={{ marginTop: '1rem', fontSize: '0.85rem', padding: '0.5rem 1.25rem' }}
-              onClick={() => { setMinScore(6); setFilterReview('all'); setFilterUniversity('all'); setFilterPlatform('all'); setSearchName(''); }}>
+              onClick={() => { setMinScore(6); setFilterTier('all'); setFilterReview('all'); setFilterUniversity('all'); setFilterPlatform('all'); setSearchName(''); }}>
               Clear Filters
             </button>
           </div>
@@ -261,6 +292,7 @@ export default function LeadTable({
                 </th>
                 <th>Candidate</th>
                 <th>Headline &amp; Intent</th>
+                <th>Tier</th>
                 <th className={styles.sortableHeader} onClick={() => handleSortBy('qualityScore')}>
                   Score <SortIcon col="qualityScore" />
                 </th>
@@ -273,7 +305,7 @@ export default function LeadTable({
               </tr>
             </thead>
             <tbody>
-              {filteredLeads.map(lead => {
+              {pagedLeads.map(lead => {
                 const platform = lead.metadata?.platform as string | undefined;
                 const platMeta = platform ? PLATFORM_META[platform] : undefined;
                 const statusColor = STATUS_COLORS[lead.status || 'new'];
@@ -313,6 +345,21 @@ export default function LeadTable({
                           <span className={styles.intentScore} title={`Intent Score: ${lead.intentScore}/3`}>⚡{lead.intentScore ?? '—'}</span>
                         </div>
                       </div>
+                    </td>
+
+                    {/* Tier badge */}
+                    <td>
+                      {lead.tier ? (() => {
+                        const t = TIER_META[lead.tier as 1 | 2 | 3];
+                        return (
+                          <span
+                            title={t.title}
+                            style={{ display: 'inline-block', padding: '2px 7px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.03em', background: t.bg, color: t.color, border: `1px solid ${t.color}40` }}
+                          >
+                            {t.label}
+                          </span>
+                        );
+                      })() : <span style={{ color: '#94a3b8' }}>—</span>}
                     </td>
 
                     {/* Score */}
@@ -413,6 +460,31 @@ export default function LeadTable({
           </table>
         )}
       </div>
+
+      {/* ── Pagination ── */}
+      {totalPages > 1 && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem', padding: '1rem', borderTop: '1px solid var(--border)' }}>
+          <button
+            className="btn btn-secondary"
+            onClick={() => setPage(p => Math.max(0, p - 1))}
+            disabled={page === 0}
+            style={{ padding: '0.35rem 0.75rem' }}
+          >
+            <FiChevronLeft size={14} />
+          </button>
+          <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+            Page {page + 1} of {totalPages} &nbsp;·&nbsp; {filteredLeads.length} leads
+          </span>
+          <button
+            className="btn btn-secondary"
+            onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+            disabled={page >= totalPages - 1}
+            style={{ padding: '0.35rem 0.75rem' }}
+          >
+            <FiChevronRight size={14} />
+          </button>
+        </div>
+      )}
 
       {/* ── Analytics Modal ── */}
       {showAnalytics && (

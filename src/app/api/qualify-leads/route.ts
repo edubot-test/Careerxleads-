@@ -81,7 +81,7 @@ function computeMockScore(p: any): Lead {
     name: fullName, university, fieldOfStudy, graduationYear,
     linkedinUrl: p.url || p.linkedinUrl
   });
-  const nonTier1University    = isNonTier1University(university);
+  const eliteUniversity       = !isNonTier1University(university); // true = MIT/Stanford/etc.
 
   const qualityScore =
     (indianOriginConfirmed ? 3 : 0) +
@@ -89,7 +89,7 @@ function computeMockScore(p: any): Lead {
     (jobSearchIntent       ? 2 : 0) +
     (relevantField         ? 1 : 0) +
     (profileComplete       ? 1 : 0) +
-    (nonTier1University    ? 1 : 0);
+    (eliteUniversity       ? -2 : 1); // penalty for elite schools (strong pipelines already)
 
   const intentScore: 1 | 2 | 3 = jobSearchIntent ? 3 : mastersStudent ? 2 : 1;
 
@@ -108,6 +108,7 @@ function computeMockScore(p: any): Lead {
     seekingInternship: headline.includes('intern'),
     seekingFullTime: (headline.includes('full-time') || headline.includes('full time') ||
                      (headline.includes('seeking') && !headline.includes('intern'))),
+    tier: (qualityScore >= 8 && intentScore === 3 ? 1 : qualityScore >= 6 || intentScore >= 2 ? 2 : 3) as 1 | 2 | 3,
     intentScore,
     qualityScore,
     outreachMessage: `Hi ${fullName.split(' ')[0] || 'there'},\n\nI noticed you're pursuing your ${degree || 'MS'} in ${fieldOfStudy} at ${university || 'your university'}. Many international students struggle converting applications to interviews. CareerXcelerator helps students move from role clarity to real job offers.\n\nHappy to share a few insights if helpful!`,
@@ -119,7 +120,7 @@ function computeMockScore(p: any): Lead {
       jobSearchIntent,
       relevantField,
       profileComplete,
-      nonTier1University,
+      nonTier1University: !eliteUniversity,
     },
     metadata: p.metadata || undefined,
   };

@@ -12,8 +12,9 @@ export interface Lead {
   socialMediaUrl: string | null;
   seekingInternship: boolean;
   seekingFullTime: boolean;
-  intentScore: number; // 1, 2, or 3
-  qualityScore: number; // 0–10 composite quality score
+  tier: 1 | 2 | 3;       // 1=hot (score≥8+intent3), 2=warm, 3=cold
+  intentScore: number;   // 1, 2, or 3
+  qualityScore: number;  // 0–10 composite quality score
   outreachMessage: string;
   status: 'new' | 'contacted' | 'replied' | 'call booked' | 'converted';
   reviewFlag: 'approved' | 'review_needed';

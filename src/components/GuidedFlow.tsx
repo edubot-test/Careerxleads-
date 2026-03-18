@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import styles from './GuidedFlow.module.css';
 import { FiSend, FiArrowRight, FiCommand, FiUser, FiCheckCircle, FiDollarSign, FiInfo } from 'react-icons/fi';
 import { GenerationParams } from '@/types';
@@ -158,14 +158,12 @@ export default function GuidedFlow({ onComplete }: GuidedFlowProps) {
     }, 800);
   };
 
-  const getLeadCount = () => {
+  const currentLeadGoal = useMemo(() => {
     const raw = answers.leadCount as string;
     if (!raw) return 100;
     const match = raw.match(/\d+/);
     return match ? parseInt(match[0]) : 100;
-  };
-
-  const currentLeadGoal = getLeadCount();
+  }, [answers.leadCount]);
   const apifyCost = aiBudget?.apify ?? (currentLeadGoal * 0.005);
   const aiCost = aiBudget?.ai ?? (currentLeadGoal * 0.002);
   const totalCost = aiBudget?.total ?? (apifyCost + aiCost);

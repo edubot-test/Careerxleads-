@@ -5,7 +5,7 @@ import GuidedFlow from '@/components/GuidedFlow';
 import LeadTable from '@/components/LeadTable';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { GenerationParams, Lead, PipelineStats, SearchHistoryEntry } from '@/types';
-import { FiLoader, FiCheckCircle, FiDatabase, FiTarget, FiMessageSquare, FiAlertTriangle, FiRefreshCw, FiClock } from 'react-icons/fi';
+import { FiLoader, FiCheckCircle, FiAlertTriangle, FiRefreshCw, FiClock } from 'react-icons/fi';
 import styles from './page.module.css';
 
 const SESSION_KEY = 'careerx_session';
@@ -13,7 +13,8 @@ const HISTORY_KEY = 'careerx_history';
 
 export default function Home() {
   const [phase, setPhase]               = useState<'gathering' | 'processing' | 'results' | 'error'>('gathering');
-  const [processingStep, setProcessingStep] = useState(0);
+  const [agentLog, setAgentLog]         = useState<string[]>([]);
+  const [activePlatform, setActivePlatform] = useState<string | null>(null);
   const [leads, setLeads]               = useState<Lead[]>([]);
   const [isExporting, setIsExporting]   = useState(false);
   const [exportMessage, setExportMessage] = useState<string | null>(null);
@@ -35,6 +36,18 @@ export default function Home() {
       const hist = localStorage.getItem(HISTORY_KEY);
       if (hist) setSearchHistory(JSON.parse(hist));
     } catch { /* ignore corrupt localStorage */ }
+
+    // Sync state across tabs — if another tab updates feedback/status, reflect it here
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === SESSION_KEY && e.newValue) {
+        try {
+          const { leads: l, stats: s, mockWarning: m } = JSON.parse(e.newValue);
+          if (l?.length) { setLeads(l); setStats(s || null); setMockWarning(m || null); }
+        } catch { /* ignore */ }
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
   }, []);
 
   // ── Persist session whenever leads change ─────────────────────────────────
@@ -58,82 +71,84 @@ export default function Home() {
 
   const fmtElapsed = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 
-  // ── Main pipeline ─────────────────────────────────────────────────────────
+  // ── Agent pipeline (SSE streaming from /api/run-agent) ───────────────────
   const handleFlowComplete = async (params: GenerationParams) => {
     setPhase('processing');
     setErrorMessage('');
     setMockWarning(null);
     setStats(null);
     setElapsed(0);
+    setAgentLog([]);
+    setActivePlatform(null);
+    startTimer();
+
+    const addLog = (msg: string) => setAgentLog(prev => [...prev.slice(-19), msg]);
 
     try {
-      // Step 1 — Generate strategy
-      setProcessingStep(1);
-      const strategyRes = await fetch('/api/generate-strategy', {
+      const res = await fetch('/api/run-agent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(params),
-      });
-      if (!strategyRes.ok) throw new Error((await strategyRes.json()).error || 'Failed to generate strategy');
-      const strategy = await strategyRes.json();
-
-      // Step 2 — Scrape (with elapsed timer)
-      setProcessingStep(2);
-      startTimer();
-      const scrapeRes = await fetch('/api/scrape-leads', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ strategy, params }),
-      });
-      stopTimer();
-      if (!scrapeRes.ok) throw new Error((await scrapeRes.json()).error || 'Failed to scrape leads');
-      const scrapeData = await scrapeRes.json();
-      const profiles: any[] = scrapeData.profiles || [];
-      const warnings: string[] = [];
-      if (scrapeData.isMock) warnings.push(`Profiles: ${scrapeData.mockReason}`);
-
-      // Step 3 — Qualify
-      setProcessingStep(3);
-      const qualifyRes = await fetch('/api/qualify-leads', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ profiles, params }),
-      });
-      if (!qualifyRes.ok) throw new Error((await qualifyRes.json()).error || 'Qualification engine failure');
-      const qualifyData = await qualifyRes.json();
-
-      if (qualifyData.isMock) warnings.push(`Scoring: ${qualifyData.mockReason}`);
-      if (qualifyData.partialMock) warnings.push(`Scoring: ${qualifyData.mockReason}`);
-
-      const pipelineStats: PipelineStats = {
-        scraped:   qualifyData.scrapedCount  ?? profiles.length,
-        qualified: qualifyData.qualifiedCount ?? (qualifyData.leads || []).length,
-        rejected:  qualifyData.rejectedCount  ?? Math.max(0, profiles.length - (qualifyData.leads || []).length),
-      };
-
-      setMockWarning(warnings.length > 0 ? warnings.join(' · ') : null);
-      setStats(pipelineStats);
-      setLeads(qualifyData.leads || []);
-
-      // Save to search history
-      const entry: SearchHistoryEntry = {
-        id: Date.now().toString(),
-        timestamp: new Date().toISOString(),
-        params,
-        qualifiedCount: pipelineStats.qualified,
-      };
-      setSearchHistory(prev => {
-        const updated = [entry, ...prev].slice(0, 5);
-        try { localStorage.setItem(HISTORY_KEY, JSON.stringify(updated)); } catch { /* ignore */ }
-        return updated;
+        body: JSON.stringify({ params }),
       });
 
-      setPhase('results');
+      if (!res.body) throw new Error('No response body from agent');
 
+      const reader  = res.body.getReader();
+      const decoder = new TextDecoder();
+      let   buffer  = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          try {
+            const { event, data } = JSON.parse(line.slice(6));
+
+            if (event === 'progress') {
+              addLog(data.message);
+            } else if (event === 'tool_start') {
+              setActivePlatform(data.platform);
+              addLog(`Searching ${data.platform}…`);
+            } else if (event === 'tool_done') {
+              addLog(`${data.platform}: ${data.qualifiedNew} new leads (total ${data.totalQualified})`);
+            } else if (event === 'complete') {
+              stopTimer();
+              const finalLeads: Lead[] = data.leads || [];
+              const pipelineStats: PipelineStats = data.stats || { scraped: finalLeads.length, qualified: finalLeads.length, rejected: 0 };
+              setLeads(finalLeads);
+              setStats(pipelineStats);
+              if (data.isMock) setMockWarning(data.mockReason || 'Demo data shown');
+
+              const entry: SearchHistoryEntry = {
+                id: Date.now().toString(),
+                timestamp: new Date().toISOString(),
+                params,
+                qualifiedCount: pipelineStats.qualified,
+              };
+              setSearchHistory(prev => {
+                const updated = [entry, ...prev].slice(0, 5);
+                try { localStorage.setItem(HISTORY_KEY, JSON.stringify(updated)); } catch { /* ignore */ }
+                return updated;
+              });
+
+              setPhase('results');
+            } else if (event === 'error') {
+              throw new Error(data.message || 'Agent error');
+            }
+          } catch (parseErr: any) {
+            if (parseErr.message?.includes('Agent')) throw parseErr;
+          }
+        }
+      }
     } catch (error: any) {
       stopTimer();
-      console.error('Lead generation failed:', error);
-      setErrorMessage(error.message || 'An unexpected error occurred during lead discovery.');
+      setErrorMessage(error.message || 'An unexpected error occurred.');
       setPhase('error');
     }
   };
@@ -154,9 +169,14 @@ export default function Home() {
       });
       const data = await res.json();
       if (res.ok) {
-        const msg = data.duplicatesFound > 0
-          ? `Exported ${data.totalSent} leads (${data.duplicatesFound} already in sheet)`
-          : `Exported ${data.totalSent} leads to Google Sheets`;
+        let msg: string;
+        if (data.exportedCount === 0) {
+          msg = 'All leads already in sheet — nothing new to export';
+        } else if (data.duplicatesFound > 0) {
+          msg = `Exported ${data.exportedCount} leads (${data.duplicatesFound} already in sheet)`;
+        } else {
+          msg = `Exported ${data.exportedCount} leads to Google Sheets`;
+        }
         setExportMessage(msg);
         setTimeout(() => setExportMessage(null), 4000);
       } else {
@@ -231,38 +251,33 @@ export default function Home() {
             <div className={styles['processing-header']}>
               <div className={styles.pulseRing}></div>
               <FiLoader className={styles.spinner} size={48} />
-              <h2 style={{ marginTop: '1.5rem' }} className="text-gradient">CareerXcelerator Agent at Work</h2>
-              <p style={{ color: 'var(--text-secondary)' }}>Applying strict guardrails and filtering noise…</p>
+              <h2 style={{ marginTop: '1.5rem' }} className="text-gradient">Agent at Work</h2>
+              <p style={{ color: 'var(--text-secondary)' }}>
+                {activePlatform
+                  ? `Searching ${activePlatform}…`
+                  : 'Claude is deciding which platforms to search…'}
+              </p>
+              {elapsed > 0 && (
+                <div className={styles.elapsedBadge} style={{ marginTop: '0.5rem' }}>
+                  <FiClock size={11} /> {fmtElapsed(elapsed)}
+                </div>
+              )}
             </div>
 
-            <div className={styles.processingSteps}>
-              <div className={`${styles.step} ${processingStep >= 1 ? styles.stepActive : ''}`}>
-                <div className={styles.stepIcon}>{processingStep > 1 ? <FiCheckCircle /> : <FiTarget />}</div>
-                <div className={styles.stepText}>
-                  <h4>Formulating Search Strategy</h4>
-                  <p>Analyzing parameters to find the best platforms and queries</p>
-                </div>
-              </div>
-              <div className={`${styles.step} ${processingStep >= 2 ? styles.stepActive : ''}`}>
-                <div className={styles.stepIcon}>{processingStep > 2 ? <FiCheckCircle /> : <FiDatabase />}</div>
-                <div className={styles.stepText}>
-                  <h4>Gathering Profiles</h4>
-                  <p>Running Apify actors to collect potential leads</p>
-                </div>
-                {processingStep === 2 && elapsed > 0 && (
-                  <div className={styles.elapsedBadge}>
-                    <FiClock size={11} /> {fmtElapsed(elapsed)}
+            {agentLog.length > 0 && (
+              <div className={styles.processingSteps}>
+                {agentLog.map((msg, i) => (
+                  <div key={i} className={`${styles.step} ${i === agentLog.length - 1 ? styles.stepActive : ''}`}>
+                    <div className={styles.stepIcon}>
+                      {i === agentLog.length - 1 ? <FiLoader size={14} /> : <FiCheckCircle size={14} />}
+                    </div>
+                    <div className={styles.stepText}>
+                      <p style={{ margin: 0 }}>{msg}</p>
+                    </div>
                   </div>
-                )}
+                ))}
               </div>
-              <div className={`${styles.step} ${processingStep >= 3 ? styles.stepActive : ''}`}>
-                <div className={styles.stepIcon}>{processingStep > 3 ? <FiCheckCircle /> : <FiMessageSquare />}</div>
-                <div className={styles.stepText}>
-                  <h4>Strict Qualification (12 Guardrails)</h4>
-                  <p>Rejecting irrelevant profiles and scoring for high intent</p>
-                </div>
-              </div>
-            </div>
+            )}
           </div>
         </div>
       )}
