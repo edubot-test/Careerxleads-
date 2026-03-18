@@ -213,18 +213,18 @@ export default function Home() {
 
       {/* ── Gathering ── */}
       {phase === 'gathering' && (
-        <div className="animate-fade-in">
-          <div className={styles.heroSection}>
-            <h1 className="text-gradient">CareerXcelerator Discovery</h1>
-            <p style={{ color: 'var(--text-secondary)' }}>
-              Identify high-intent candidates globally. Our AI browses platforms, applies strict quality guardrails, and exports vetted leads directly to your workspace.
+        <div className={`${styles.gatheringLayout} animate-fade-in`}>
+          {/* Compact Header for Discovery Flow */}
+          <div className={styles.compactHeader}>
+            <h1 className="text-gradient">Lead Discovery</h1>
+            <p className="text-secondary text-sm">
+              AI-driven candidate sourcing and qualification guardrails.
             </p>
           </div>
 
-          {/* Search history */}
+          {/* Search history - compact chips */}
           {searchHistory.length > 0 && (
-            <div className={styles.historyBar}>
-              <span className={styles.historyLabel}>Recent searches:</span>
+            <div className={styles.historyBarCompact}>
               {searchHistory.map(h => (
                 <button
                   key={h.id}
@@ -232,15 +232,17 @@ export default function Home() {
                   onClick={() => handleFlowComplete(h.params)}
                   title={`${new Date(h.timestamp).toLocaleDateString()} · ${h.qualifiedCount} leads`}
                 >
-                  {h.params.fields} · {h.params.originCountry} · {h.qualifiedCount} leads
+                  {h.params.fields} · {h.qualifiedCount} leads
                 </button>
               ))}
             </div>
           )}
 
-          <ErrorBoundary>
-            <GuidedFlow onComplete={handleFlowComplete} />
-          </ErrorBoundary>
+          <div className={styles.flowWrapper}>
+            <ErrorBoundary>
+              <GuidedFlow onComplete={handleFlowComplete} />
+            </ErrorBoundary>
+          </div>
         </div>
       )}
 
