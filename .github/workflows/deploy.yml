@@ -47,3 +47,4 @@ jobs:
           # Optional empty commit to trigger deployment hooks
           git commit --allow-empty -m "Deployment triggered from ${{ steps.set_branch.outputs.branch_name }}"
           git push origin ${{ steps.set_branch.outputs.branch_name }}
+          
