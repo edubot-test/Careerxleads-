@@ -1,5 +1,4 @@
 import { SENIOR_TITLES, LOW_FIELDS, isEliteUni } from './patterns';
-import { checkIndianOrigin } from './origin';
 
 export interface RejectionAnalysis {
   breakdown: Record<string, number>;
@@ -13,8 +12,8 @@ export function analyzeRejections(rawProfiles: any[], qualifiedLeads: any[]): Re
   const qualifiedIds = new Set(qualifiedLeads.map((l: any) => l.id));
   const breakdown: Record<string, number> = {
     seniorTitle: 0, irrelevantField: 0, missingProfile: 0,
-    missingEducation: 0, notMasters: 0, eliteUniversity: 0,
-    wrongOrigin: 0, tooLowScore: 0,
+    missingEducation: 0, notRelevantDegree: 0, eliteUniversity: 0,
+    tooLowScore: 0,
   };
   const uniCounts: Record<string, number>   = {};
   const fieldCounts: Record<string, number> = {};
@@ -33,17 +32,12 @@ export function analyzeRejections(rawProfiles: any[], qualifiedLeads: any[]): Re
       continue;
     }
 
-    if (SENIOR_TITLES.some(t => headline.includes(t)))                           { breakdown.seniorTitle++;     continue; }
-    if (LOW_FIELDS.some(f => field.toLowerCase().includes(f)))                   { breakdown.irrelevantField++; continue; }
-    if (!name || name === 'Unknown' || !p.linkedinUrl)                           { breakdown.missingProfile++;  continue; }
+    if (SENIOR_TITLES.some(t => headline.includes(t)))                           { breakdown.seniorTitle++;       continue; }
+    if (LOW_FIELDS.some(f => field.toLowerCase().includes(f)))                   { breakdown.irrelevantField++;   continue; }
+    if (!name || name === 'Unknown' || !p.linkedinUrl)                           { breakdown.missingProfile++;    continue; }
     const hasEnoughEdu = !!(edu.schoolName || edu.degree || edu.fieldOfStudy || p.university);
-    if (!hasEnoughEdu)                                                           { breakdown.missingEducation++; continue; }
-    const isMasters = /master|ms\b|m\.s\.|mba|meng|m\.sc/i.test(degree)
-                   || /\bms\b|m\.s\.|master|mba|meng/i.test(headline);
-    if (!isMasters)                                                              { breakdown.notMasters++;      continue; }
-    if (isEliteUni(uni))                                                         { breakdown.eliteUniversity++; continue; }
-    // Origin check — uses same 5-signal function as qualification
-    if (!checkIndianOrigin(p))                                                   { breakdown.wrongOrigin++;     continue; }
+    if (!hasEnoughEdu)                                                           { breakdown.missingEducation++;  continue; }
+    if (isEliteUni(uni))                                                         { breakdown.eliteUniversity++;   continue; }
     breakdown.tooLowScore++;
   }
 
@@ -54,16 +48,15 @@ export function analyzeRejections(rawProfiles: any[], qualifiedLeads: any[]): Re
   const dominantReason = dominantEntry?.[0] ?? 'tooLowScore';
 
   const HINTS: Record<string, string> = {
-    wrongOrigin:      'Add origin country explicitly — e.g. "India" "Indian" or common Indian surnames to queries',
-    notMasters:       'Tighten degree filter — add "MS" "Master of Science" "graduate student" to queries',
-    missingEducation: 'Profiles lack education data — try more specific university name queries or use google dork with "university" keyword',
-    eliteUniversity:  'Too many elite university profiles — drop prestige keywords; target regional state schools, mid-tier private universities, polytechnics',
-    missingProfile:   'Profiles lack URL or name — try longer takePages or a different searchQuery',
-    seniorTitle:      'Too many senior professionals — add "student" "2025" "recent grad" to exclude experienced hires',
-    irrelevantField:  'Wrong field of study — narrow queries to specific relevant fields like "Computer Science" "Data Science" "Engineering"',
-    tooLowScore:      'Profiles match demographics but lack intent signals — add "seeking" "internship" "open to work" "actively looking"',
+    notRelevantDegree: 'Add degree keywords — "Masters" "MS" "MSc" "MBA" "graduate" to queries',
+    missingEducation: 'Profiles lack education data — try more specific university name queries',
+    eliteUniversity:  'Too many elite university profiles — target regional/mid-tier universities instead',
+    missingProfile:   'Profiles lack URL or name — try longer takePages or different queries',
+    seniorTitle:      'Too many senior professionals — add "student" "recent grad" "entry-level" to queries',
+    irrelevantField:  'Wrong field of study — narrow queries to specific relevant fields',
+    tooLowScore:      'Profiles lack intent signals — add "seeking" "open to work" "job hunt" "career switch"',
   };
-  const adaptationHint = HINTS[dominantReason] ?? 'Rewrite queries with more specific intent and degree signals';
+  const adaptationHint = HINTS[dominantReason] ?? 'Rewrite queries with more specific intent and location signals';
 
   return { breakdown, topUniversities, topFields, dominantReason, adaptationHint };
 }

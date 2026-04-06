@@ -1,38 +1,28 @@
-import { INDIAN_SURNAME_RE, INDIAN_UNI_RE, ISA_ORG_RE, DESI_LANGUAGE_RE, INDIA_PREP_RE } from './patterns';
+import { EU_COUNTRY_RE, EU_CITY_RE, EU_UNI_RE, JOB_SEARCH_INTENT_RE, WORK_PERMIT_RE } from './patterns';
 
 /**
- * Unified 5-signal Indian origin check.
- * Used by both qualification (signals.ts) and rejection analysis (rejection.ts).
+ * Check if a profile is EU-based or EU-relevant.
+ * Returns true if ANY signal indicates they're in or targeting EU.
+ * This is intentionally broad — we want diverse profiles, not origin filtering.
  */
-export function checkIndianOrigin(p: any): boolean {
-  const fullName = p.fullName || p.name || '';
+export function checkEURelevance(p: any): boolean {
+  const location = (p.location || '').toLowerCase();
   const headline = (p.headline || '').toLowerCase();
   const summary = (p.summary || '').toLowerCase();
+  const combinedText = `${location} ${headline} ${summary}`;
 
-  const orgs = (p.organizations || p.volunteerExperiences || [])
-    .map((o: any) => (o.organizationName || o.name || '').toLowerCase()).join(' ');
-  const languages = (p.languages || [])
-    .map((l: any) => (l.name || l || '').toLowerCase()).join(' ');
-  const combinedText = `${headline} ${summary} ${languages} ${orgs}`;
+  const currentUni = (p.education?.[0]?.schoolName || p.university || '').toLowerCase();
 
-  // Find undergrad education entry (B.Tech/B.E.)
-  const undergradEdu = (p.education || []).find((e: any) =>
-    /b\.?tech|b\.?e\b|bachelor of (engineering|technology)|b\.?sc engg/i.test(e.degreeName || ''),
-  ) || p.education?.[1] || {};
-  const undergradDeg = (undergradEdu.degreeName || '').toLowerCase();
-  const undergradUniStr = (undergradEdu.schoolName || '').toLowerCase();
+  // Signal 1: Located in EU
+  const euLocation = EU_COUNTRY_RE.test(location) || EU_CITY_RE.test(location);
+  // Signal 2: Studying at EU university
+  const euUni = EU_UNI_RE.test(currentUni);
+  // Signal 3: Mentions EU work permit / visa
+  const euVisa = WORK_PERMIT_RE.test(combinedText);
+  // Signal 4: EU city/country mentioned in headline/summary
+  const euMention = EU_COUNTRY_RE.test(combinedText) || EU_CITY_RE.test(combinedText);
+  // Signal 5: Active job search (universal — not origin-specific)
+  const jobSearch = JOB_SEARCH_INTENT_RE.test(headline);
 
-  // Signal 1: Indian surname
-  const surnameMatch = INDIAN_SURNAME_RE.test(fullName);
-  // Signal 2: B.Tech from Indian university
-  const btechSignal = /b\.?tech|b\.?e\b|bachelor of (engineering|technology)|b\.?sc engg/i.test(undergradDeg)
-    && INDIAN_UNI_RE.test(undergradUniStr);
-  // Signal 3: ISA/IGSA membership
-  const isaSignal = ISA_ORG_RE.test(orgs) || ISA_ORG_RE.test(combinedText);
-  // Signal 4: Desi language
-  const langSignal = DESI_LANGUAGE_RE.test(languages) || DESI_LANGUAGE_RE.test(summary);
-  // Signal 5: India prep services
-  const prepSignal = INDIA_PREP_RE.test(combinedText);
-
-  return surnameMatch || btechSignal || isaSignal || langSignal || prepSignal;
+  return euLocation || euUni || euVisa || euMention || jobSearch;
 }

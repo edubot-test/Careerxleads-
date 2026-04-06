@@ -74,7 +74,7 @@ function computeMockScore(p: any): Lead {
   const headline      = (p.headline || '').toLowerCase();
   const fullName      = p.fullName || p.name || '';
 
-  const indianOriginConfirmed = /sharma|patel|desai|gupta|singh|kumar|mehta|joshi|kapoor|verma|reddy|rao|iyer|nair|pillai|chandra|krishna|agarwal|malhotra|bose|chatterjee|mukherjee|banerjee|das|ghosh|sen|saha|basu|dey|roy|mishra|tiwari|pandey|dubey|yadav|shukla|srivastava|tripathi|chauhan|jain|mahajan/i.test(fullName);
+  const euRelevant = /seeking|looking for|open to work|actively|job hunt|career switch|united states|usa|uk|united kingdom|ireland|europe/i.test(headline + ' ' + (p.location || ''));
   // Check both degree field AND headline/snippet — Google/GitHub profiles carry degree in headline
   const mastersStudent        = /master|ms\b|m\.s\.|mba|m\.b\.a\.|meng|m\.eng|m\.sc/i.test(degree) ||
                                 /\bms\b|m\.s\.|master|mba|meng|m\.eng|m\.sc/i.test(headline);
@@ -87,7 +87,8 @@ function computeMockScore(p: any): Lead {
   const eliteUniversity       = !isNonTier1University(university); // true = MIT/Stanford/etc.
 
   const qualityScore =
-    (indianOriginConfirmed ? 3 : 0) +
+    (euRelevant ? 2 : 0) +
+    (jobSearchIntent ? 1 : 0) +
     (mastersStudent        ? 2 : 0) +
     (jobSearchIntent       ? 2 : 0) +
     (relevantField         ? 1 : 0) +
@@ -115,11 +116,11 @@ function computeMockScore(p: any): Lead {
     tier: (qualityScore >= 8 && intentScore === 3 ? 1 : qualityScore >= 6 || intentScore >= 2 ? 2 : 3) as 1 | 2 | 3,
     intentScore,
     qualityScore,
-    outreachMessage: `Hi ${fullName.split(' ')[0] || 'there'},\n\nI noticed you're pursuing your ${degree || 'MS'} in ${fieldOfStudy} at ${university || 'your university'}. Many international students struggle converting applications to interviews. CareerXcelerator helps students move from role clarity to real job offers.\n\nHappy to share a few insights if helpful!`,
+    outreachMessage: `Hi ${fullName.split(' ')[0] || 'there'},\n\nI noticed you're pursuing your ${degree || 'degree'} in ${fieldOfStudy} at ${university || 'your university'}. The job market is competitive right now. CareerX helps people go from applications to real offers.\n\nHappy to share a few insights if helpful!`,
     status: 'new',
     reviewFlag: qualityScore >= 8 ? 'approved' : 'review_needed',
     qualityBreakdown: {
-      indianOriginConfirmed,
+      euRelevant,
       mastersStudent,
       jobSearchIntent,
       relevantField,
@@ -132,26 +133,26 @@ function computeMockScore(p: any): Lead {
 
 // ── Prompt builder ────────────────────────────────────────────────────────────
 function buildPrompt(chunk: any[], params: any): string {
-  return `You are a Lead Qualifier for CareerXcelerator, a platform helping international students land jobs in the US.
+  return `You are a Lead Qualifier for CareerX, a career services platform helping people in USA, UK, and Ireland land full-time jobs.
 
 TARGET CRITERIA:
-- Origin Country: ${params.originCountry}
-- Stage: ${params.stage}
+- Location: ${params.visaStatus || 'USA, UK, Ireland'}
 - Fields: ${params.fields}
 - Opportunity Types: ${params.opportunityTypes}
+- Priority: Indian-origin candidates are priority, but include DIVERSE profiles from all backgrounds
 
 SCORING SYSTEM (max 10 points):
-- +3 if origin matches ${params.originCountry} (name patterns, prior education in that country, or explicit mention)
+- +3 if active job search / career switch intent ("seeking", "open to work", "career switch", "no offers")
 - +2 if currently a Masters student or recent Masters/MBA graduate
-- +2 if headline shows job/internship intent ("seeking", "open to work", "looking for", "actively searching")
+- +2 if located in or targeting USA/UK/Ireland
 - +1 if field is relevant to: ${params.fields}
 - +1 if profile is complete (has name, university, field, graduation year, and a profile URL)
-- +1 if university is NOT a tier-1 school (MIT, Stanford, Harvard, Carnegie Mellon, Berkeley, Caltech, Princeton, Yale, Columbia, Cornell, Michigan, UCLA, UIUC, Duke, Johns Hopkins, Northwestern, Georgia Tech)
+- +1 if university is NOT a tier-1 school (MIT, Stanford, Harvard, CMU, Berkeley, Oxford, Cambridge, Imperial, ETH Zurich)
 
 INTENT SCORE (1–3):
-- 3: Actively seeking ("seeking internship", "open to work", "looking for opportunities", "job hunting")
-- 2: Student with unclear or no job signals
-- 1: Early stage student or clearly does not fit ICP
+- 3: Actively seeking ("seeking", "open to work", "job hunting", "career switch", work permit struggle)
+- 2: Student with job signals or career change signals
+- 1: Early stage student or no active job signals
 
 EDUCATION EXTRACTION:
 Profiles from LinkedIn have an "education" array — use education[0] (most recent):
@@ -194,11 +195,11 @@ RESPOND ONLY WITH THIS EXACT JSON (no markdown, no explanation):
       "seekingFullTime": false,
       "intentScore": 3,
       "qualityScore": 8,
-      "outreachMessage": "Hi [First Name], I noticed you're pursuing your [Degree] in [Field] at [University]. Many international students struggle converting applications to interviews. CareerXcelerator helps students move from role clarity to real job offers. Happy to share a few insights if helpful!",
+      "outreachMessage": "Hi [First Name], I noticed you're pursuing your [Degree] in [Field] at [University]. The job market is tough right now. CareerX helps people go from applications to real offers. Happy to share a few insights if helpful!",
       "status": "new",
       "reviewFlag": "approved",
       "qualityBreakdown": {
-        "indianOriginConfirmed": true,
+        "euRelevant": true,
         "mastersStudent": true,
         "jobSearchIntent": true,
         "relevantField": true,

@@ -22,8 +22,16 @@ interface Question {
 const questions: Question[] = [
   {
     key: 'originCountry',
-    text: 'Which origin country should we target for this batch?',
-    examples: ['India', 'China', 'Nigeria', 'Philippines', 'Bangladesh', 'Diverse Global Students']
+    text: 'Which candidate background should we prioritise? (all backgrounds will be included)',
+    options: [
+      'Indian-origin (priority) + Diverse mix',
+      'Diverse Global (all backgrounds equally)',
+      'South Asian (India, Pakistan, Bangladesh, Sri Lanka)',
+      'East Asian (China, Korea, Japan, Southeast Asia)',
+      'European locals + immigrants',
+      'African & Middle Eastern',
+    ],
+    examples: []
   },
   {
     key: 'fields',
@@ -53,12 +61,12 @@ const questions: Question[] = [
   },
   {
     key: 'visaStatus',
-    text: 'Which destination country are these candidates in?',
+    text: 'Which country are these candidates based in?',
     options: [
-      'United States (OPT / CPT / H1B)',
-      'United Kingdom (Graduate Visa / Tier 2)',
-      'Canada (PGWP / Express Entry)',
-      'Ireland / Australia / UAE / Europe'
+      'United States (all candidates in USA)',
+      'United Kingdom (all candidates in UK)',
+      'Ireland (all candidates in Ireland)',
+      'USA + UK + Ireland (all three markets)',
     ],
     examples: []
   },

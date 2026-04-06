@@ -1,7 +1,7 @@
 /**
  * Estimate graduation date from year + month hint in headline.
  * Checks for explicit month names, then "Spring" → May, "Fall/Winter" → December.
- * Defaults to May 15 (spring commencement — most common US grad date).
+ * Defaults to May 15 (spring commencement — most common US/EU grad date).
  */
 export function getGradDateEstimate(gradYr: number, headline: string): Date {
   const h = headline.toLowerCase();
@@ -22,31 +22,37 @@ export function getGradDateEstimate(gradYr: number, headline: string): Date {
   return new Date(gradYr, 4, 15); // default: May 15
 }
 
-// H1B dates are configurable via env vars — USCIS dates vary by year.
-// Defaults: season March–May, results window March 15 – May 15.
+// Work permit / visa season timing — configurable via env vars.
+// US: H1B season March–May. UK: Graduate visa year-round. Ireland: Critical Skills year-round.
+// We keep a generic "peak hiring season" window that applies across markets.
 function safeInt(raw: string | undefined, fallback: number, min: number, max: number): number {
   const n = parseInt(raw || String(fallback), 10);
   return (isNaN(n) || n < min || n > max) ? fallback : n;
 }
-const H1B_SEASON_START = safeInt(process.env.H1B_SEASON_START_MONTH, 3, 1, 12);
-const H1B_SEASON_END   = safeInt(process.env.H1B_SEASON_END_MONTH,   5, 1, 12);
-const H1B_RESULTS_START_MONTH = safeInt(process.env.H1B_RESULTS_START_MONTH, 3, 1, 12);
-const H1B_RESULTS_START_DAY   = safeInt(process.env.H1B_RESULTS_START_DAY,   15, 1, 31);
-const H1B_RESULTS_END_MONTH   = safeInt(process.env.H1B_RESULTS_END_MONTH,   5, 1, 12);
-const H1B_RESULTS_END_DAY     = safeInt(process.env.H1B_RESULTS_END_DAY,     15, 1, 31);
 
-/** H1B lottery season (default: March–May, configurable via H1B_SEASON_* env vars) */
-export function isH1BSeasonNow(): boolean {
-  const m = new Date().getMonth() + 1; // 1=Jan
-  return m >= H1B_SEASON_START && m <= H1B_SEASON_END;
+const PEAK_SEASON_START = safeInt(process.env.H1B_SEASON_START_MONTH, 1, 1, 12); // Jan — spring hiring
+const PEAK_SEASON_END   = safeInt(process.env.H1B_SEASON_END_MONTH,   5, 1, 12); // May
+const RESULTS_START_MONTH = safeInt(process.env.H1B_RESULTS_START_MONTH, 3, 1, 12);
+const RESULTS_START_DAY   = safeInt(process.env.H1B_RESULTS_START_DAY,   1, 1, 31);
+const RESULTS_END_MONTH   = safeInt(process.env.H1B_RESULTS_END_MONTH,   6, 1, 12);
+const RESULTS_END_DAY     = safeInt(process.env.H1B_RESULTS_END_DAY,     30, 1, 31);
+
+/** Peak hiring / work permit season (default: January–May) */
+export function isWorkPermitSeasonNow(): boolean {
+  const m = new Date().getMonth() + 1;
+  return m >= PEAK_SEASON_START && m <= PEAK_SEASON_END;
 }
 
-/** H1B Results Window (default: March 15 – May 15, configurable via H1B_RESULTS_* env vars) */
-export function isH1BResultsWindow(): boolean {
+/** Work permit results / peak urgency window (default: March 1 – June 30) */
+export function isWorkPermitResultsWindow(): boolean {
   const now = new Date();
-  const m = now.getMonth() + 1; // 1=Jan
+  const m = now.getMonth() + 1;
   const d = now.getDate();
-  const afterStart = m > H1B_RESULTS_START_MONTH || (m === H1B_RESULTS_START_MONTH && d >= H1B_RESULTS_START_DAY);
-  const beforeEnd  = m < H1B_RESULTS_END_MONTH   || (m === H1B_RESULTS_END_MONTH   && d <= H1B_RESULTS_END_DAY);
+  const afterStart = m > RESULTS_START_MONTH || (m === RESULTS_START_MONTH && d >= RESULTS_START_DAY);
+  const beforeEnd  = m < RESULTS_END_MONTH   || (m === RESULTS_END_MONTH   && d <= RESULTS_END_DAY);
   return afterStart && beforeEnd;
 }
+
+// Backward compat aliases
+export const isH1BSeasonNow = isWorkPermitSeasonNow;
+export const isH1BResultsWindow = isWorkPermitResultsWindow;

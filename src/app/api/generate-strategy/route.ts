@@ -110,12 +110,12 @@ export async function POST(req: Request) {
         .map(a => `  - "${a.id}" (Tier ${a.tier}, ${a.platform}): ${a.description}`)
         .join('\n');
 
-      const prompt = `You are an elite Lead Discovery Strategist for CareerXcelerator, a service helping international students (primarily Indian-origin MS/MBA students) find jobs in the US.
+      const prompt = `You are an elite Lead Discovery Strategist for CareerX, a career services platform helping people in USA, UK, and Ireland land full-time jobs — from skill assessment to placement. We target a diverse mix of candidates with Indian-origin as priority.
 
 CANDIDATE PERSONA:
 - Audience: ${params.audience}
-- Origin Country: ${params.originCountry}
-- Current Location: ${params.currentLocation}
+- Priority Background: ${params.originCountry}
+- Target Location: ${params.visaStatus || params.currentLocation || 'USA, UK, Ireland'}
 - Fields: ${params.fields}
 - Opportunity Types: ${params.opportunityTypes}
 

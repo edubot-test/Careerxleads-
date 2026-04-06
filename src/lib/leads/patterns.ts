@@ -7,33 +7,38 @@ export const LOW_FIELDS = [
   'history', 'philosophy', 'literature', 'fine arts', 'art history', 'music', 'theater',
 ];
 
-// ── Indian origin signals ─────────────────────────────────────────────────────
-export const INDIAN_SURNAME_RE = /sharma|patel|desai|gupta|singh|kumar|mehta|joshi|kapoor|verma|reddy|rao|iyer|iyengar|nair|pillai|chandra|krishna|agarwal|malhotra|bose|chatterjee|mukherjee|banerjee|das|ghosh|sen|saha|basu|dey|roy|mishra|tiwari|pandey|dubey|yadav|shukla|srivastava|tripathi|chauhan|jain|mahajan|kulkarni|deshpande|parekh|sanghavi|shah|modi|parikh|thakkar|bhatt|trivedi|deshmukh|bhosale|jadhav|shinde|patil|mahapatra|panda|mohanty|nanda|gill|sidhu|dhillon|sandhu|grewal|brar|bajwa|arora|khanna|sethi|anand|chopra|bhatia|naidu|goud|chettiar|subramaniam|venkat|rajan|krishnan|swamy|hegde|shetty|menon|varma|murthy/i;
+// ── EU location signals ──────────────────────────────────────────────────────
+export const EU_COUNTRY_RE = /germany|deutschland|france|netherlands|holland|spain|italia|italy|portugal|ireland|austria|belgium|sweden|denmark|finland|norway|switzerland|poland|czech|romania|hungary|greece|croatia|bulgaria|slovakia|slovenia|estonia|latvia|lithuania|luxembourg|malta|cyprus|uk|united kingdom|england|scotland|wales/i;
 
-export const INDIAN_UNI_RE = /anna university|vtu|visvesvaraya|jntu|jawaharlal nehru technological|pu chandigarh|mumbai university|pune university|osmania university|bangalore university|calicut university|kerala university|madras university|delhi university|du\b|bhu|banaras|allahabad university|amity|chandigarh university|lpu|lovely professional|vit|srm|manipal|saveetha|sastra|shiv nadar|shivaji university|nit |national institute of technology|bits pilani|bits goa|bits hyderabad|nims|gitam|klu|kluniversity|nit surathkal|nit trichy|nit warangal|iiest|jadavpur|calcutta university|presidency|fergus|fergusson|pccoe|coep|coe pune|sgsits|ies ips|rgpv|csvtu|maulana azad|dr mgr|anna|coimbatore institute|psg|kct|mepco|karunya/i;
+export const EU_CITY_RE = /berlin|munich|frankfurt|hamburg|paris|lyon|marseille|amsterdam|rotterdam|the hague|barcelona|madrid|lisbon|dublin|vienna|brussels|stockholm|copenhagen|helsinki|oslo|zurich|warsaw|prague|bucharest|budapest|athens|milan|rome|turin|london|manchester|birmingham|edinburgh|glasgow/i;
 
-export const ISA_ORG_RE = /\bisa\b|igsa|indian student association|association of indian students|desi|isaca india|telugu association|tamil sangam|gujarati samaj|malayalee|bengali association|marathi mandal/i;
+export const EU_UNI_RE = /technische universit|tu berlin|tu munich|tum\b|rwth|lmu|uni heidelberg|humboldt|freie universit|universit.{1,3}t|politecnico|sorbonne|sciences po|ecole|grande ecole|universiteit|delft|eindhoven|erasmus|wageningen|ku leuven|universidad|universitat|politecnica|aalto|kth|chalmers|dtu\b|ntnu|eth zurich|epfl|agh\b|charles university|jagiellonian|university college|trinity college dublin|ucd\b|nuig|dit\b|imperial|ucl\b|kings college|university of|bocconi|luiss|sapienza/i;
 
-export const DESI_LANGUAGE_RE = /hindi|telugu|tamil|marathi|gujarati|punjabi|bengali|kannada|malayalam|urdu|odia|assamese/i;
+// ── Career service signals (replaces Indian-specific patterns) ───────────────
+export const CAREER_SERVICE_RE = /career coach|career service|job placement|recruitment agency|staffing|career counseling|employment service|job centre|arbeitsagentur|pole emploi|arbetsf.rmedlingen/i;
 
-export const INDIA_PREP_RE = /yocket|leapscholar|leap scholar|idp education|manya|princeton review india|jamboree|gradvine|edwise|ims india|made easy/i;
+export const CAREER_SWITCH_RE = /career switch|career change|career transition|pivoting|reskill|upskill|bootcamp|career pivot|changing career|reconversion|umschulung|berufswechsel/i;
 
-export const CPT_UNI_RE = /harrisburg university|university of the cumberlands|cumberlands university|trine university|monroe college|westcliff university|nexford university|greenwich university|california intercontinental|campbellsville university|national university.*san diego|southern states university|university of fairfax|midwest university|university of silicon valley|silicon valley university|american national university|university of north america|una\b|california miramar|strayer university|american intercontinental|sofia university|national louis university|\bnlu\b|international technological university|\bitu\b|saint peter.{0,5}university|mcdaniel college/i;
+export const JOB_SEARCH_INTENT_RE = /seeking|looking for|open to work|actively looking|job hunt|job search|job seeker|available for hire|in transition|between jobs|on the market|searching for opportunities/i;
 
-export const BODY_SHOP_RE = /\btcs\b|tata consultancy|infosys\b|wipro\b|cognizant\b|hcl technologies|tech mahindra|mphasis|hexaware|mindtree|l&t infotech|larsen.*toubro.*infotech|ltimindtree|\blti\b|mastech|mastech digital|syntel\b|igate\b|patni\b|niit technologies|zensar|persistent systems|virtusa|coforge|collabera|diverse.?lynx|princeton information|ust global|\bust\b.*technologies|cyient|birlasoft|yash technologies|compugain|trigent software|kellton tech|datamatics|css corp|movate\b|\beclerx\b|nagarro\b|infogain\b|jade global|apexon\b|\biolap\b|bahwan cybertek|softcrylic|svam international|coda global|infovision\b|inforeliance|srinsoft|ilink systems|sonata software/i;
+export const WORK_PERMIT_RE = /work permit|blue card|eu blue card|work visa|aufenthaltstitel|arbeitserlaubnis|tier 2|skilled worker visa|residence permit|permesso di soggiorno|titre de s.jour|work authorization|visa sponsorship|right to work|sponsorship required|needs sponsorship/i;
+
+export const BODY_SHOP_RE = /\btcs\b|tata consultancy|infosys\b|wipro\b|cognizant\b|hcl technologies|tech mahindra|mphasis|hexaware|mindtree|ltimindtree|accenture|capgemini|atos\b|sopra steria|adecco|randstad|hays\b|manpower|modis\b|alten\b|altran|bertrandt|ferchau|brunel\b|staffing|body shop|outsourc/i;
 
 export const COMMENT_INTENT_RE = /\binterested\b|please refer me|can anyone refer|refer me|dm me|looking to connect|open for referral|would love to be referred|can refer|actively applying|please share.*resume|tag me|drop your resume|referral.*request|looking for referral|would appreciate a referral/i;
 
-export const FINANCIAL_CLOCK_RE = /\bemi\b|loan repayment|education loan|sbi loan|hdfc credila|\bavanse\b|prodigy finance|\bmpower\b|need job urgently|immediate joining|immediate start|financial assistance|financial pressure|can.{0,10}join immediately|available immediately|notice period.*zero|zero notice period|relieve.*immediately/i;
+export const FINANCIAL_CLOCK_RE = /loan repayment|education loan|student loan|need job urgently|immediate joining|immediate start|financial pressure|can.{0,10}join immediately|available immediately|notice period.*zero|zero notice period|relieve.*immediately|dringend|urgently seeking/i;
 
-export const RESUME_REVIEW_RE = /resume review|critique my resume|please review my resume|roast my resume|resume feedback|resume help|\bcv review\b|resume critique|ats score|ats friendly|resume tips|career review|profile review|improving my resume|rewriting my resume|resume not getting|resume getting rejected|not getting interviews/i;
+export const RESUME_REVIEW_RE = /resume review|critique my resume|please review my resume|roast my resume|resume feedback|resume help|\bcv review\b|resume critique|ats score|ats friendly|resume tips|career review|profile review|improving my resume|rewriting my resume|resume not getting|resume getting rejected|not getting interviews|lebenslauf/i;
 
 export const LINKEDIN_PREMIUM_RE = /linkedin premium|premium member|open link|career insights|inmail credit|premium subscriber|career premium|linkedin career/i;
 
-export const PRODUCT_COMPANY_RE = /\bgoogle\b|alphabet\b|meta\b|facebook\b|amazon\b|\baws\b|microsoft\b|apple\b|netflix\b|uber\b|airbnb\b|stripe\b|databricks\b|openai\b|salesforce\b|adobe\b|nvidia\b|palantir\b|doordash\b|lyft\b|pinterest\b|reddit\b|twitter\b|\bx\.com\b|linkedin\b|snap\b|spotify\b|dropbox\b|square\b|block\b|robinhood\b|coinbase\b|twilio\b|snowflake\b|confluent\b|hashicorp\b|figma\b|notion\b|asana\b|monday\.com\b/i;
+export const PRODUCT_COMPANY_RE = /\bgoogle\b|alphabet\b|meta\b|facebook\b|amazon\b|\baws\b|microsoft\b|apple\b|netflix\b|uber\b|airbnb\b|stripe\b|databricks\b|openai\b|salesforce\b|adobe\b|nvidia\b|palantir\b|doordash\b|spotify\b|sap\b|siemens\b|bosch\b|bmw\b|daimler\b|volkswagen\b|philips\b|asml\b|adyen\b|klarna\b|revolut\b|n26\b|deliveroo\b|just eat|booking\.com\b|trivago\b|zalando\b|wise\b|skyscanner\b|king\.com\b|ubisoft\b|criteo\b|datadog\b|contentful\b|celonis\b|personio\b/i;
 
 // ── Elite university set (HARD REJECT — outside ICP) ─────────────────────────
+// These graduates don't need career services — they have strong employer pipelines
 const ELITE_UNIS = new Set([
+  // US elite
   'mit', 'massachusetts institute of technology',
   'stanford', 'stanford university',
   'harvard', 'harvard university',
@@ -42,49 +47,31 @@ const ELITE_UNIS = new Set([
   'caltech', 'california institute of technology',
   'princeton', 'princeton university', 'yale', 'yale university',
   'columbia', 'columbia university', 'cornell', 'cornell university',
-  'university of michigan', 'umich', 'ucla', 'university of california los angeles',
-  'uiuc', 'university of illinois', 'illinois urbana',
-  'duke', 'duke university', 'johns hopkins', 'jhu',
-  'northwestern', 'northwestern university',
-  'georgia tech', 'georgia institute of technology',
-  'purdue', 'purdue university', 'university of washington',
-  'dartmouth', 'dartmouth college', 'brown university',
-  'university of pennsylvania', 'upenn', 'wharton',
-  'rice university', 'vanderbilt university', 'emory university',
-  'university of notre dame', 'washington university in st louis', 'wustl',
-  'university of virginia', 'uva', 'university of north carolina', 'unc chapel hill',
-  'university of southern california', 'usc viterbi',
-  'indian institute of technology',
-  'iit bombay', 'iit delhi', 'iit madras', 'iit kanpur', 'iit kharagpur',
-  'iit roorkee', 'iit guwahati', 'iit hyderabad', 'iit gandhinagar', 'iit bhu',
-  'iit jodhpur', 'iit patna', 'iit mandi', 'iit tirupati', 'iit palakkad',
-  'iit dharwad', 'iit bhilai', 'iit jammu', 'iit indore', 'iit varanasi',
-  'iisc', 'indian institute of science',
-  'indian institute of management', 'iim ahmedabad', 'iim bangalore',
-  'iim calcutta', 'iim kozhikode', 'iim lucknow', 'iim indore', 'iim shillong',
-  'bits pilani', 'bits goa', 'bits hyderabad',
+  // UK elite
   'university of oxford', 'oxford university', 'university of cambridge', 'cambridge university',
   'imperial college', 'imperial college london',
   'london school of economics', 'lse', 'ucl', 'university college london',
-  'university of toronto', 'u of toronto', 'university of british columbia', 'ubc',
-  'university of waterloo', 'mcgill', 'mcgill university',
-  'national university of singapore', 'nus', 'nanyang technological university', 'ntu singapore',
-  'university of melbourne', 'university of sydney',
-  'unsw', 'university of new south wales', 'australian national university', 'anu',
+  // EU elite
+  'eth zurich', 'epfl',
   'tu munich', 'technical university of munich', 'tum',
   'lmu munich', 'ludwig maximilian university', 'rwth aachen',
-  'eth zurich', 'epfl',
+  // Asia elite
   'peking university', 'pku', 'tsinghua', 'tsinghua university',
+  'national university of singapore', 'nus', 'nanyang technological university', 'ntu singapore',
   'hkust', 'hong kong university of science and technology',
+  // Indian elite
+  'indian institute of technology',
+  'iit bombay', 'iit delhi', 'iit madras', 'iit kanpur', 'iit kharagpur',
+  'iisc', 'indian institute of science',
+  // Other elite
+  'university of toronto', 'mcgill', 'mcgill university',
+  'university of melbourne', 'university of sydney',
 ]);
 
 export function isEliteUni(university: string): boolean {
   const u = university.toLowerCase().trim();
   if (!u) return false;
   if (ELITE_UNIS.has(u)) return true;
-  // Word-boundary check: match only if the elite name appears as a complete
-  // word/phrase within the university string (prevents "Columbia" matching
-  // "British Columbia" or "Stanford" matching "Stanford-adjacent Community College")
   return Array.from(ELITE_UNIS).some(e => {
     if (e.length < 7) return false;
     const re = new RegExp(`(?:^|\\W)${e.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:\\W|$)`, 'i');
@@ -92,46 +79,45 @@ export function isEliteUni(university: string): boolean {
   });
 }
 
-// ── University tiering ────────────────────────────────────────────────────────
-// Tier 2: well-known mid-tier — decent recruiting but high competition
+// ── University tiering (EU-focused) ──────────────────────────────────────────
+// Tier 2: well-known EU universities — good programs but graduates still need career support
 const TIER2_UNI_PATTERNS = [
-  'san jose state', 'sjsu', 'ut dallas', 'university of texas at dallas',
-  'northeastern', 'drexel', 'arizona state', 'asu',
-  'university of florida', 'ohio state', 'university of maryland',
-  'university of minnesota', 'penn state', 'pennsylvania state', 'michigan state',
-  'university of pittsburgh', 'university of massachusetts', 'umass',
-  'rutgers', 'stony brook', 'suny stony brook',
-  'george mason', 'george washington', 'gwu', 'boston university',
-  'university of illinois at chicago', 'uic', 'university of houston',
-  'temple university', 'rensselaer polytechnic', 'rpi',
-  'worcester polytechnic', 'wpi', 'depaul', 'villanova',
-  'texas tech', 'virginia tech', 'clemson',
-  'university of connecticut', 'uconn', 'university of delaware',
-  'university of iowa', 'university of colorado', 'university of arizona',
+  'tu berlin', 'tu darmstadt', 'tu dresden', 'kit', 'karlsruhe',
+  'university of amsterdam', 'vrije universiteit', 'tu delft', 'tu eindhoven',
+  'university of barcelona', 'universidad complutense', 'politecnica de madrid',
+  'sorbonne', 'université paris', 'ecole polytechnique',
+  'politecnico di milano', 'politecnico di torino', 'sapienza',
+  'ku leuven', 'ghent university',
+  'aalto university', 'kth royal', 'chalmers',
+  'trinity college dublin', 'university college dublin',
+  'university of warsaw', 'agh university', 'charles university',
+  'university of vienna', 'tu wien',
+  'university of copenhagen', 'dtu', 'ntnu',
+  // US mid-tier (for immigrants from US)
+  'san jose state', 'sjsu', 'northeastern', 'arizona state', 'asu',
+  'university of florida', 'ohio state', 'penn state', 'rutgers',
 ];
 
-// Tier 3: regional/private — prime CareerX targets (recruiters rarely visit)
+// Tier 3: regional EU universities — prime CareerX targets
 const TIER3_UNI_PATTERNS = [
-  'stevens institute', 'illinois institute of technology', 'illinois tech',
-  'new jersey institute', 'njit', 'pace university', 'hofstra',
-  'long island university', 'liu', 'fairleigh dickinson', 'fdu',
-  'kean university', 'montclair state', 'florida international', 'fiu',
-  'florida atlantic', 'fau', 'university of central florida', 'ucf',
-  'university of south florida', 'usf', 'california state', 'cal state',
-  'california polytechnic', 'cal poly', 'san francisco state', 'sfsu',
-  'san diego state', 'sdsu', 'colorado state', 'kansas state',
-  'oklahoma state', 'louisiana state', 'lsu', 'university of alabama',
-  'university of arkansas', 'wright state', 'kent state', 'bowling green',
-  'western michigan', 'eastern michigan', 'ball state',
-  'indiana university purdue', 'iupui', 'university of memphis',
-  'university of louisville', 'old dominion', 'virginia commonwealth', 'vcu',
-  'howard university', 'morgan state', 'florida state',
-  'university of mississippi', 'university of nebraska', 'university of nevada',
-  'university of new mexico', 'university of akron', 'university of dayton',
-  'university of hartford', 'quinnipiac', 'sacred heart', 'adelphi',
-  'nyit', 'new york institute of technology',
-  'suny albany', 'suny buffalo', 'suny binghamton', 'suny new paltz',
-  'mercy college', 'molloy', 'touro', 'yeshiva university',
+  // Germany regional
+  'universität', 'hochschule', 'fachhochschule', 'fh ',
+  'university of applied sciences', 'htw', 'hawk',
+  // Netherlands regional
+  'hogeschool', 'hanze', 'saxion', 'fontys', 'avans',
+  // France regional
+  'université de', 'inalco', 'esiee', 'efrei',
+  // Spain/Italy regional
+  'universidad de', 'università di', 'universitat de',
+  // Nordics regional
+  'university of turku', 'university of tampere', 'lund university',
+  'stockholm university', 'gothenburg',
+  // Ireland regional
+  'technological university', 'institute of technology',
+  'munster technological', 'atlantic technological',
+  // Eastern Europe
+  'university of bucharest', 'technical university', 'polytechnic',
+  'university of debrecen', 'university of pécs',
 ];
 
 /** 1=elite (reject), 2=mid-tier target, 3=prime regional, 4=ultra-prime small */

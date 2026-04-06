@@ -24,10 +24,10 @@ export interface Lead {
   universityTier?: 2 | 3 | 4; // 2=mid-tier target, 3=prime regional, 4=ultra-prime small (1=elite → rejected)
   networkingScore?: number;    // 0–10: product-company network exposure (low = service-company trap)
   optDaysRemaining?: number;   // days until 90-day OPT unemployment limit (set when < 90 days post-grad)
-  detectedLanguage?: string;   // first Indian language detected (Telugu/Tamil/etc.) for regional outreach
-  regionalTag?: string;        // highest-confidence region via 4-signal combinator (undergrad uni > lang > org > surname)
+  detectedLanguage?: string;   // detected country/region for regional outreach
+  regionalTag?: string;        // country tag (Germany, UK, Ireland, etc.) for personalized outreach
   qualityBreakdown: {
-    indianOriginConfirmed: boolean;
+    euRelevant: boolean;
     mastersStudent: boolean;
     jobSearchIntent: boolean;
     relevantField: boolean;

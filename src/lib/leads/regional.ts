@@ -1,110 +1,68 @@
-// ── Per-region surname matrices (most distinctive → least distinctive) ─────────
-export const REGIONAL_SURNAMES = {
-  Telugu:   /\breddy\b|\brao\b|\bgoud\b|\bnaidu\b|chowdhary|subbarao|\bvenkat|\bteja\b|\bmurthy\b|\bprasad\b|\bsastry\b|\bsastri\b/i,
-  Tamil:    /\biyer\b|iyengar|subramaniam|subramanyan|\brajan\b|\bkrishnan\b|\bswamy\b|venugopal|\bbalaji\b|\bmurugan\b|\bselvan\b|\barumugam\b/i,
-  Bengali:  /chatterjee|mukherjee|banerjee|\bghosh\b|\bsen\b|\bsaha\b|\bbasu\b|\bbose\b|\bdey\b|chakraborty|\broy\b|\bdas\b/i,
-  Marathi:  /kulkarni|deshpande|\bpatil\b|deshmukh|bhosale|\bjadhav\b|\bshinde\b|\bkadam\b|\bkamble\b/i,
-  Punjabi:  /\bgill\b|\bsidhu\b|\bdhillon\b|\bsandhu\b|\bgrewal\b|\bbrar\b|\bbajwa\b|\barora\b|\bkhanna\b/i,
-  Gujarati: /\bpatel\b|\bshah\b|\bdesai\b|\bparekh\b|\bsanghavi\b|\bparikh\b|\btrivedi\b|\bthakkar\b|\bbhatt\b/i,
-  Kannada:  /\bshetty\b|\bhegde\b|\bgowda\b|\bnaik\b|\bkammath\b/i,
-  Malayalam: /\bnair\b|\bpillai\b|\bmenon\b|\bvarma\b|\bkurup\b|\bpanikker\b/i,
-  Hindi:    /\bsharma\b|\bsingh\b|\bkumar\b|\bverma\b|\bgupta\b|\bmishra\b|\btiwari\b|\bpandey\b|\bshukla\b|\byadav\b|\bsrivastava\b|\btripathi\b/i,
-} as const;
+import { EU_COUNTRY_RE, EU_CITY_RE } from './patterns';
 
-/** Undergrad university → region (100% accurate for B.Tech grads) */
-export function detectUniRegion(undergradUni: string): string | undefined {
-  const u = undergradUni.toLowerCase();
-  if (!u) return undefined;
-  if (/jntu|jawaharlal nehru technological|osmania|andhra university|gitam|klu\b|kluniversity|jntuh|jntuk|jntua|srm.*ap|vit.*ap|rgukt|iit.*hyderabad/i.test(u)) return 'Telugu';
-  if (/anna university|srm\b|vit\b|sastra|psg\b|kct\b|mepco|karunya|coimbatore|amrita|thiagarajar|nit trichy|nit calicut|iit.*madras|loyola/i.test(u)) return 'Tamil';
-  if (/jadavpur|calcutta university|iiest|presidency|techno.*india|wbut|heritage.*calcutta|iit.*kharagpur|makaut/i.test(u)) return 'Bengali';
-  if (/mumbai university|pune university|coep|vjti|somaiya|sgsits|shivaji university|pccoe|mit.*pune|iit.*bombay|symbiosis/i.test(u)) return 'Marathi';
-  if (/thapar|chitkara|lovely professional|lpu|punjabi university|pu chandigarh|gndu|iit.*ropar/i.test(u)) return 'Punjabi';
-  if (/gujarat university|nirma|ddit|dharmsinh|svnit|ganpat|uca\b|ldrp|iit.*gandhinagar|pdpu/i.test(u)) return 'Gujarati';
-  if (/visvesvaraya|vtu|msrit|rvce|pes university|nit.*surathkal|iit.*dharwad/i.test(u)) return 'Kannada';
-  if (/kerala university|calicut university|cusat|nit.*calicut|iit.*palakkad|model engineering/i.test(u)) return 'Malayalam';
-  if (/aktu|hbtu|ipu|ggsipu|delhi university|\bdtu\b|\bnsit\b|amity|bennett|rgpv|csvtu|maulana azad|iit.*delhi|iit.*kanpur|iit.*roorkee|iit.*bhu/i.test(u)) return 'Hindi';
-  return undefined;
-}
-
-/** Cultural org / Sangam membership → region */
-export function detectOrgRegion(orgsText: string): string | undefined {
-  const o = orgsText.toLowerCase();
-  if (/\btana\b|telugu association|ata\b.*telugu|telangana.*assoc|andhra.*assoc|ntsa\b/i.test(o)) return 'Telugu';
-  if (/tamil sangam|tamil.*assoc|tasa\b|desi.*tamil/i.test(o)) return 'Tamil';
-  if (/bengali.*assoc|durga puja|basa\b|bengal.*student/i.test(o)) return 'Bengali';
-  if (/marathi mandal|maharashtra.*mandal|bnm\b|pune.*alumni/i.test(o)) return 'Marathi';
-  if (/punjabi.*assoc|bhangra|gurdwara|sikh.*student/i.test(o)) return 'Punjabi';
-  if (/gujarati samaj|gujarati.*assoc|navratri|jain.*assoc/i.test(o)) return 'Gujarati';
-  if (/kannada.*assoc|karnataka.*assoc|akka\b/i.test(o)) return 'Kannada';
-  if (/malayalee|kerala.*assoc|keralite/i.test(o)) return 'Malayalam';
-  if (/hindi.*assoc|north.*indian.*assoc/i.test(o)) return 'Hindi';
-  return undefined;
-}
+// ── EU Country detection from profile signals ────────────────────────────────
+const COUNTRY_PATTERNS: Record<string, RegExp> = {
+  Germany:     /germany|deutschland|berlin|munich|m.nchen|frankfurt|hamburg|stuttgart|d.sseldorf|cologne|k.ln|dortmund|essen|leipzig|dresden|nuremberg|n.rnberg/i,
+  Netherlands: /netherlands|holland|amsterdam|rotterdam|the hague|den haag|eindhoven|utrecht|groningen|delft|leiden/i,
+  France:      /france|paris|lyon|marseille|toulouse|nice|nantes|strasbourg|montpellier|bordeaux|lille/i,
+  Spain:       /spain|espa.a|madrid|barcelona|valencia|seville|sevilla|bilbao|malaga|m.laga/i,
+  Italy:       /italy|italia|milan|milano|rome|roma|turin|torino|florence|firenze|naples|napoli|bologna/i,
+  Ireland:     /ireland|dublin|cork|galway|limerick|waterford/i,
+  Sweden:      /sweden|stockholm|gothenburg|g.teborg|malm.|uppsala|link.ping/i,
+  Denmark:     /denmark|copenhagen|k.benhavn|aarhus|odense/i,
+  Austria:     /austria|vienna|wien|graz|salzburg|innsbruck|linz/i,
+  Belgium:     /belgium|brussels|bruxelles|antwerp|antwerpen|ghent|gent|leuven/i,
+  Switzerland: /switzerland|zurich|z.rich|geneva|gen.ve|basel|bern|lausanne/i,
+  Poland:      /poland|warsaw|warszawa|krakow|krak.w|wroclaw|wroc.aw|poznan|pozna./i,
+  Portugal:    /portugal|lisbon|lisboa|porto|braga|coimbra/i,
+  Finland:     /finland|helsinki|espoo|tampere|turku|oulu/i,
+  Norway:      /norway|oslo|bergen|trondheim|stavanger/i,
+  Czech:       /czech|prague|praha|brno|ostrava/i,
+  UK:          /united kingdom|\buk\b|england|london|manchester|birmingham|edinburgh|glasgow|bristol|leeds|liverpool|cambridge|oxford/i,
+};
 
 /**
- * 4-signal regional origin combinator.
- * Priority: undergrad university (100% accurate) > language array > cultural org > surname.
+ * Detect which EU country the profile is associated with.
+ * Checks location, headline, university, and summary.
  */
 export function detectRegionalTag(p: any): string | undefined {
-  // Signal 1: undergrad university
-  const undergradEdu = (p.education || []).find((e: any) =>
-    /b\.?tech|b\.?e\b|bachelor of (engineering|technology)|b\.?sc engg/i.test(e.degreeName || ''),
-  );
-  const uniRegion = detectUniRegion(undergradEdu?.schoolName || '');
-  if (uniRegion) return uniRegion;
+  const location = (p.location || '').toLowerCase();
+  const headline = (p.headline || '').toLowerCase();
+  const uni = (p.education?.[0]?.schoolName || p.university || '').toLowerCase();
+  const combined = `${location} ${headline} ${uni}`;
 
-  // Signal 2: languages array
-  const langs = (p.languages || []).map((l: any) => (l.name || l || '').toLowerCase()).join(' ');
-  if (/\btelugu\b/.test(langs))    return 'Telugu';
-  if (/\btamil\b/.test(langs))     return 'Tamil';
-  if (/\bbengali\b/.test(langs))   return 'Bengali';
-  if (/\bmarathi\b/.test(langs))   return 'Marathi';
-  if (/\bpunjabi\b/.test(langs))   return 'Punjabi';
-  if (/\bgujarati\b/.test(langs))  return 'Gujarati';
-  if (/\bkannada\b/.test(langs))   return 'Kannada';
-  if (/\bmalayalam\b/.test(langs)) return 'Malayalam';
-  if (/\bhindi\b/.test(langs))     return 'Hindi';
-
-  // Signal 3: cultural org / Sangam
-  const orgsText = (p.organizations || p.volunteerExperiences || [])
-    .map((o: any) => (o.organizationName || o.name || '')).join(' ');
-  const orgRegion = detectOrgRegion(orgsText);
-  if (orgRegion) return orgRegion;
-
-  // Signal 4: surname (least precise — checked last)
-  const fullName = (p.name || p.fullName || '').toLowerCase();
-  for (const [region, re] of Object.entries(REGIONAL_SURNAMES)) {
-    if (re.test(fullName)) return region;
+  for (const [country, pattern] of Object.entries(COUNTRY_PATTERNS)) {
+    if (pattern.test(combined)) return country;
   }
   return undefined;
 }
 
-/** Returns the regional outreach suffix with optional alma mater reference.
- *  Always starts with a sentence break so it reads naturally when appended. */
+/** Returns the regional outreach suffix with country-specific personalization. */
 export function buildRegionalSuffix(tag: string | undefined, undergradSchool: string | null): string {
   if (!tag) return '';
-  const almaRef = undergradSchool ? ` (${undergradSchool})` : '';
+  const schoolRef = undergradSchool ? ` from ${undergradSchool}` : '';
   switch (tag) {
-    case 'Telugu':
-      return `\n\nP.S. I've helped many Telugu engineers${almaRef} navigate this exact path — JNTU/Osmania background to US product companies is our sweet spot.`;
-    case 'Tamil':
-      return `\n\nP.S. Many students${almaRef} from the Tamil community have landed FAANG offers through our network. Anna Uni / SRM / VIT grads consistently perform well in our programme.`;
-    case 'Bengali':
-      return `\n\nP.S. We have a strong track record with Jadavpur / Calcutta University engineers${almaRef} making this exact transition to US product companies.`;
-    case 'Marathi':
-      return `\n\nP.S. I've worked with many engineers${almaRef} making the Pune / Mumbai to US product-company jump — it's a well-trodden path once you have the right network.`;
-    case 'Punjabi':
-      return `\n\nP.S. Our Punjabi engineering community${almaRef} has a strong referral network specifically for this kind of service-to-product pivot.`;
-    case 'Gujarati':
-      return `\n\nP.S. Our community of Desi engineers${almaRef} has navigated this exact situation and come out on the other side with offers.`;
-    case 'Kannada':
-      return `\n\nP.S. We've helped many VTU / MSRIT engineers${almaRef} bridge from Bengaluru service roles to US product-company offers.`;
-    case 'Malayalam':
-      return `\n\nP.S. Kerala engineers${almaRef} in our network consistently land product company offers — the technical foundation is strong, the network just needs to be built.`;
-    case 'Hindi':
-      return `\n\nP.S. Transitioning from${almaRef || ' a North Indian college'} to a US product company requires a specific playbook — and we have it.`;
+    case 'Germany':
+      return `\n\nP.S. The German job market has unique requirements${schoolRef} — from Bewerbungsmappe formatting to work permit navigation. We've helped many professionals land roles at top German companies.`;
+    case 'Netherlands':
+      return `\n\nP.S. The Dutch tech scene is booming${schoolRef} — from Amsterdam startups to Eindhoven's high-tech campus. We know the 30% ruling and KvK process inside out.`;
+    case 'France':
+      return `\n\nP.S. Whether you're targeting Paris or Lyon${schoolRef}, the French job market rewards the right network. We've helped candidates navigate titre de séjour and CDI offers.`;
+    case 'Ireland':
+      return `\n\nP.S. Dublin's tech hub${schoolRef} is one of Europe's strongest — Google, Meta, Stripe all have EU HQs there. We've helped many candidates land roles through the Critical Skills Permit route.`;
+    case 'UK':
+      return `\n\nP.S. The UK job market${schoolRef} is competitive but full of opportunity — from London's fintech scene to Manchester's growing tech hub. We've helped candidates navigate the Skilled Worker visa process.`;
+    case 'Sweden':
+      return `\n\nP.S. Sweden's tech ecosystem${schoolRef} — Spotify, Klarna, King — is incredibly welcoming to international talent. We've helped candidates navigate the work permit process.`;
+    case 'Spain':
+      return `\n\nP.S. Spain's growing tech scene${schoolRef} — from Barcelona's startups to Madrid's enterprise sector — offers great opportunities. We can help navigate the autónomo and work permit process.`;
+    case 'Italy':
+      return `\n\nP.S. Italy's tech sector is growing fast${schoolRef} — Milan and Turin especially. We can help with the permesso di soggiorno process and connecting you to the right companies.`;
+    case 'Switzerland':
+      return `\n\nP.S. Swiss salaries are among Europe's highest${schoolRef}, but the job market is unique. We've helped candidates navigate B/L permits and break into companies like Google Zurich, UBS, and Swiss startups.`;
+    case 'Poland':
+      return `\n\nP.S. Poland has become a major tech hub in Central Europe${schoolRef} — Krakow and Warsaw especially. Competitive salaries with lower cost of living make it an attractive option.`;
     default:
-      return '';
+      return `\n\nP.S. We've helped many professionals${schoolRef} land roles across Europe. The EU job market rewards the right approach — and we have the playbook.`;
   }
 }

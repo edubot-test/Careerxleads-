@@ -428,7 +428,7 @@ export default function LeadTable({
                           {lead.qualityScore}/10
                         </div>
                         <div className={styles.guardrailList}>
-                          {lead.qualityBreakdown?.indianOriginConfirmed && <span title="Indian Origin">🇮🇳</span>}
+                          {lead.qualityBreakdown?.euRelevant && <span title="Location Relevant">📍</span>}
                           {lead.qualityBreakdown?.mastersStudent         && <span title="Masters Student">🎓</span>}
                           {lead.qualityBreakdown?.jobSearchIntent        && <span title="Job Search Intent">🔎</span>}
                           {(lead.struggleScore ?? 0) >= 6               && <span title={`Struggle Score: ${lead.struggleScore}/10 — high-pain lead`}>🔥</span>}

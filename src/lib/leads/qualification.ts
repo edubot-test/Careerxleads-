@@ -22,10 +22,11 @@ export function mockScore(p: any): any {
   const headlineLower = headline.toLowerCase();
 
   const {
-    indianOriginConfirmed, mastersStudent, jobSearchIntent, relevantField, profileComplete,
-    visaStruggle, h1bPanic, h1bResultsPanic, cptSchool, bodyShopExit,
-    commentIntent, financialClock, resumeReview, premiumBadge, frustration, skillGap,
-    timePressure, networkTrap, networkingScore, regionalTag, uniTier, optDaysRemaining,
+    euRelevant, mastersStudent, jobSearchIntent, relevantField, profileComplete,
+    visaStruggle, workPermitPanic, workPermitResultsPanic,
+    bodyShopExit, commentIntent, financialClock, resumeReview, premiumBadge,
+    frustration, skillGap, timePressure, careerSwitch,
+    networkTrap, networkingScore, regionalTag, uniTier, optDaysRemaining,
   } = signals;
 
   // Hard reject: elite current university
@@ -40,19 +41,20 @@ export function mockScore(p: any): any {
       intentScore: 1 as const, outreachMessage: '', status: 'new',
       reviewFlag: 'review_needed' as const,
       qualityBreakdown: {
-        indianOriginConfirmed: false, mastersStudent: false, jobSearchIntent: false,
+        euRelevant: false, mastersStudent: false, jobSearchIntent: false,
         relevantField: false, profileComplete: false, nonTier1University: false,
       },
       metadata: p.metadata || undefined,
     };
   }
 
-  const qualityScore = (indianOriginConfirmed ? 3 : 0) + (mastersStudent ? 2 : 0)
-    + (jobSearchIntent ? 2 : 0) + (relevantField ? 1 : 0) + (profileComplete ? 1 : 0) + 1;
+  // Quality score: EU relevance gives +2, job search intent +3, degree +2, field +1, profile +1, non-elite +1
+  const qualityScore = (euRelevant ? 2 : 0) + (mastersStudent ? 2 : 0)
+    + (jobSearchIntent ? 3 : 0) + (relevantField ? 1 : 0) + (profileComplete ? 1 : 0) + 1;
 
   const intentScore: 1 | 2 | 3 =
-    (cptSchool || h1bPanic || h1bResultsPanic || visaStruggle || commentIntent || (timePressure && jobSearchIntent)) ? 3
-    : (frustration || skillGap || bodyShopExit || financialClock || resumeReview || premiumBadge || networkTrap || jobSearchIntent) ? 2
+    (workPermitPanic || workPermitResultsPanic || visaStruggle || commentIntent || (timePressure && jobSearchIntent)) ? 3
+    : (frustration || skillGap || bodyShopExit || financialClock || resumeReview || premiumBadge || networkTrap || careerSwitch || jobSearchIntent) ? 2
     : 1;
 
   const struggleScore = calcStruggleScore(signals);
@@ -74,9 +76,9 @@ export function mockScore(p: any): any {
     email: p.email || null,
     phone: p.phone || null,
     socialMediaUrl: p.metadata?.platform === 'GitHub' ? (p.url || null) : null,
-    seekingInternship: /intern|cpt\b/i.test(headlineLower),
-    seekingFullTime: /full.?time|new grad|recent grad|open to work|actively looking|\bopt\b|ead\b|job hunt/i.test(headlineLower)
-      || (headlineLower.includes('seeking') && !/intern|cpt\b/i.test(headlineLower)),
+    seekingInternship: /intern|werkstudent|praktik/i.test(headlineLower),
+    seekingFullTime: /full.?time|new grad|recent grad|open to work|actively looking|job hunt|career switch/i.test(headlineLower)
+      || (headlineLower.includes('seeking') && !/intern/i.test(headlineLower)),
     tier, intentScore, qualityScore, struggleScore,
     universityTier: uniTier,
     networkingScore,
@@ -86,7 +88,7 @@ export function mockScore(p: any): any {
     outreachMessage,
     status: 'new',
     reviewFlag: qualityScore >= 8 ? 'approved' : 'review_needed',
-    qualityBreakdown: { indianOriginConfirmed, mastersStudent, jobSearchIntent, relevantField, profileComplete, nonTier1University: true },
+    qualityBreakdown: { euRelevant, mastersStudent, jobSearchIntent, relevantField, profileComplete, nonTier1University: true },
     metadata: p.metadata || undefined,
   };
 }
@@ -109,7 +111,7 @@ export async function qualifyProfiles(
   }
 
   const CHUNK = 100;
-  const CONCURRENCY = 3; // Process up to 3 chunks in parallel
+  const CONCURRENCY = 3;
   const allLeads: any[] = [];
 
   const chunks: any[][] = [];
@@ -117,62 +119,49 @@ export async function qualifyProfiles(
     chunks.push(capped.slice(i, i + CHUNK));
   }
 
-  // Process chunks in parallel batches
   for (let b = 0; b < chunks.length; b += CONCURRENCY) {
     const batch = chunks.slice(b, b + CONCURRENCY);
     const results = await Promise.allSettled(batch.map(async (chunk) => {
       const phoneMap = new Map(chunk.map((p: any) => [String(p.id), p.phone || null]));
 
-      const prompt = `You are a Lead Qualifier for CareerXcelerator, a platform helping international students land jobs in the US.
+      const prompt = `You are a Lead Qualifier for CareerX, a career services platform helping people in the USA, UK, and Ireland land full-time jobs — from skill assessment to placement.
 
-TARGET: Origin=${params.originCountry}, Stage=${params.stage}, Fields=${params.fields}, Opportunity=${params.opportunityTypes}
+TARGET: Location=${params.visaStatus || 'USA, UK, Ireland'}, Fields=${params.fields}, Opportunity=${params.opportunityTypes}
+Priority: Indian-origin candidates are priority, but we want a DIVERSE mix — include candidates of all backgrounds who are in our target locations.
 
 SCORING (max 10):
-+3 Indian origin (see 5-signal check below) | +2 Masters student/grad | +2 job/intern intent | +1 relevant field | +1 complete profile | +1 non-elite current university
++3 active job search / career switch intent | +2 relevant degree (Masters, MBA, professional) | +2 EU/UK/US location relevance | +1 relevant field | +1 complete profile | +1 non-elite university
 
-INDIAN ORIGIN — 5-SIGNAL CHECK (set indianOriginConfirmed=true if ANY fires):
-1. SURNAME: Sharma, Patel, Desai, Gupta, Singh, Kumar, Mehta, Joshi, Kapoor, Verma, Reddy, Rao, Iyer, Iyengar, Nair, Pillai, Chandra, Krishna, Agarwal, Malhotra, Bose, Chatterjee, Mukherjee, Banerjee, Das, Ghosh, Sen, Saha, Mishra, Tiwari, Pandey, Yadav, Shukla, Jain, Kulkarni, Deshpande, Patil, Deshmukh, Naidu, Goud, Subramaniam, Venkat, Hegde, Shetty, Menon, Varma, Murthy, Gill, Sidhu, Dhillon, Sandhu, Shah, Modi, Parikh, Bhatt, Trivedi, Mahapatra, Panda, Mohanty (or any clearly Indian surname)
-2. B.TECH UNDERGRAD: Education array has a 2nd entry (undergrad) with degree "B.Tech" or "B.E." from any Indian university (Anna University, VTU, JNTU, NIT, VIT, SRM, Manipal, Amity, LPU, Mumbai University, Pune University, etc.)
-3. INDIAN LANGUAGE: Languages section lists Hindi, Telugu, Tamil, Marathi, Gujarati, Punjabi, Bengali, Kannada, Malayalam, or Odia
-4. ISA/IGSA MEMBERSHIP: Organizations section mentions Indian Student Association, IGSA, ISA, Telugu Association, Tamil Sangam, Gujarati Samaj, Desi club, or similar
-5. INDIA PREP SERVICES: Mentions Yocket, LeapScholar, IDP Education, Manya, Jamboree, Gradvine in recommendations or interests
+INTENT BOOSTERS:
+intentScore=3 if: work permit/visa struggle + actively seeking | career switch with urgency | "open to work" + graduating soon | commented "interested"/"refer me" on job posts
+intentScore=2 if: job-hunt signals ("seeking", "open to work", "entry-level", "no offers") | career switch signals ("pivoting", "reskilling", "bootcamp") | frustration signals ("struggling", "ghosted", "no interviews") | resume help seekers | LinkedIn Premium + still seeking | financial pressure
+intentScore=1 otherwise
 
-INTENT BOOSTERS (apply within the +2 job/intern intent slot — max still 2):
-intentScore=3 if headline/bio/snippet contains ANY of:
-  • OPT · F1 · CPT · EAD · "visa sponsorship" · "no sponsorship needed" + actively seeking/internship/full-time
-  • OPT/F1/CPT/EAD/STEM Extension/H1B sponsorship explicitly stated
-  • Graduating THIS year + actively seeking
-  • COMMENT INTENT: "Interested" · "please refer me" · "can anyone refer" · "DM me" · "looking for referral" · "would love to be referred" (person raised hand on a job post — warmest signal)
-intentScore=2 if: job-hunt signals — "seeking" · "internship" · "job hunt" · "entry-level" · "new grad" · "struggling" · "no offers" · "please help" — OR skill-gap signals — "upskilling" · "self-taught" · "bootcamp" · "looking for mentorship" · "career switch" · "pivoting" — OR time-pressure — "Graduating May/Dec [year]" · "Incoming Summer/Fall [year]" · "Class of [year]" — OR financial pressure — "immediate joining" · "available immediately" · "financial assistance" · "zero notice period" — OR resume help — "resume review" · "resume feedback" · "not getting interviews" · "ATS" · "roast my resume" — OR LinkedIn Premium badge (paid for career visibility, still seeking)
-intentScore=1 otherwise (enrolled student, no active job-hunt or financial-pressure signal)
+ICP: Students, recent graduates, and working professionals in USA/UK/Ireland who need career services — job placement, skill building, career switching. All backgrounds welcome. Indians are priority but NOT the only target. We want genuinely diverse leads.
 
-ICP: International students (especially Indian origin) doing a Masters ABROAD at a non-elite/Tier 2-4 university who struggle to find jobs. We do NOT care where they did their undergrad or which home-country university they attended — only their CURRENT abroad Masters institution matters for the elite check.
-
-University name IS required (for the current Masters). If missing → profileComplete = false (-1 point). Non-elite universities (regional state schools, mid-tier private universities, polytechnics, community colleges with grad programs, etc.) are welcomed — only brand-name elite schools are rejected.
-
-HARD REJECT (omit entirely from the leads array) if ANY of:
-- Current university is elite/brand-name: MIT, Stanford, Harvard, CMU, Berkeley, Caltech, Princeton, Yale, Columbia, Cornell, UMich, UCLA, UIUC, Duke, JHU, Northwestern, Georgia Tech, Purdue, UWashington, Dartmouth, Brown, UPenn, Wharton — OR any IIT (IIT Bombay/Delhi/Madras/Kanpur/Kharagpur/Roorkee etc.), IIM, IISc, BITS Pilani — OR Oxford, Cambridge, Imperial, LSE, UCL — OR NUS, NTU, UofT, UBC, Waterloo, McGill, ETH Zurich, EPFL, TU Munich, Peking, Tsinghua
+HARD REJECT (omit from leads array) if ANY of:
+- Current university is elite (MIT, Stanford, Harvard, CMU, Berkeley, Oxford, Cambridge, Imperial, LSE, ETH Zurich, EPFL, TU Munich, IITs, NUS, Tsinghua, Peking)
 - qualityScore < 6
-- Senior title (director, VP, head of, chief, principal, senior manager)
-- Irrelevant field
+- Senior title (director, VP, chief, principal, senior manager)
+- Irrelevant field (history, philosophy, literature, fine arts)
 - Missing name or profile URL
 
-For profiles with no education array (Google/GitHub): infer from headline. If can't infer, leave blank — do NOT reject for missing education.
+For profiles with no education array: infer from headline. Don't reject for missing education.
 
-OUTREACH MESSAGE RULES (write a unique message per lead):
+OUTREACH MESSAGE RULES:
 - Address by first name only
-- Reference ONE specific detail from their headline (e.g. a tech stack, graduation year, internship mention, OPT/CPT, specific role they're targeting, or "open to work" signal)
-- Mention their field and university by name
-- Keep it 3 sentences max, conversational, not salesy
-- End with a soft open question or offer
-- Example of BAD (generic): "Hi Priya, I noticed you're pursuing your MS in Data Science at XYZ University. Many international students struggle..."
-- Example of GOOD (specific): "Hi Priya, saw you're finishing your MS in Data Science at XYZ this May and actively looking for roles — that final semester job hunt is intense. CareerXcelerator helps students like you go from applications to real offers. Worth a quick chat?"
+- Reference ONE specific detail from their headline
+- Mention their field and university if known
+- Keep it 3 sentences max, conversational
+- End with a soft open question
+- Do NOT assume ethnicity or nationality in the message
+- Example: "Hi Alex, saw you're finishing your MSc in Data Science at TU Berlin and actively looking for roles — that final semester job hunt is intense. CareerX helps graduates go from applications to real offers. Worth a quick chat?"
 
 RAW PROFILES:
 ${JSON.stringify(chunk)}
 
 RESPOND ONLY WITH VALID JSON:
-{"leads":[{"id":"","name":"","linkedinUrl":"","university":"","degree":"","fieldOfStudy":"","graduationYear":"","location":"","headline":"","email":null,"socialMediaUrl":null,"seekingInternship":false,"seekingFullTime":false,"intentScore":2,"qualityScore":8,"outreachMessage":"Hi [First], [specific detail from headline]. CareerXcelerator helps international students go from applications to real offers. [Soft question]?","status":"new","reviewFlag":"approved","qualityBreakdown":{"indianOriginConfirmed":true,"mastersStudent":true,"jobSearchIntent":true,"relevantField":true,"profileComplete":true,"nonTier1University":true}}]}`;
+{"leads":[{"id":"","name":"","linkedinUrl":"","university":"","degree":"","fieldOfStudy":"","graduationYear":"","location":"","headline":"","email":null,"socialMediaUrl":null,"seekingInternship":false,"seekingFullTime":false,"intentScore":2,"qualityScore":8,"outreachMessage":"","status":"new","reviewFlag":"approved","qualityBreakdown":{"euRelevant":true,"mastersStudent":true,"jobSearchIntent":true,"relevantField":true,"profileComplete":true,"nonTier1University":true}}]}`;
 
       const msg = await anthropic.messages.create({
         model: CLAUDE_MODEL,
@@ -201,9 +190,6 @@ RESPOND ONLY WITH VALID JSON:
         const struggleScore = calcStruggleScore(signals);
         const tier = assignTier(l.qualityScore ?? 0, l.intentScore ?? 1, struggleScore);
 
-        // ── Regional suffix injection — fix Claude path bypass ───────────────
-        // Claude writes generic outreach; we inject the region-specific personalisation
-        // suffix post-hoc if Claude didn't already reference the regional community.
         let outreachMessage = l.outreachMessage || '';
         const regionalSuffix = buildRegionalSuffix(signals.regionalTag, signals.undergradSchool);
         const alreadyPersonalized = signals.regionalTag
@@ -235,7 +221,6 @@ RESPOND ONLY WITH VALID JSON:
       if (result.status === 'fulfilled') {
         allLeads.push(...result.value);
       } else {
-        // Fallback to local scoring on API failure
         allLeads.push(...batch[r].map(mockScore).filter(l => l.qualityScore >= 6));
       }
     }
