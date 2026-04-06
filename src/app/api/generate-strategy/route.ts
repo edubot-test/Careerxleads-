@@ -7,6 +7,8 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY || '',
 });
 
+export const maxDuration = 60; // Strategy generation needs Claude API call
+
 const CLAUDE_MODEL = process.env.CLAUDE_MODEL || 'claude-sonnet-4-6';
 
 // ── Actor Catalog ─────────────────────────────────────────────────────────────

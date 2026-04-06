@@ -10,7 +10,7 @@ import { buildAgentPrompt } from '@/lib/leads/queries';
 import { isEliteUni, SENIOR_TITLES, LOW_FIELDS } from '@/lib/leads/patterns';
 import { requireAuth } from '@/lib/auth';
 
-export const maxDuration = 60; // Vercel Hobby max (300 on Pro)
+export const maxDuration = 300; // Vercel Pro max
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY || '' });
 const CLAUDE_MODEL = process.env.CLAUDE_MODEL || 'claude-haiku-4-5-20251001';

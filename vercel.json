@@ -1,0 +1,25 @@
+{
+  "functions": {
+    "src/app/api/run-agent/route.ts": {
+      "maxDuration": 300
+    },
+    "src/app/api/scrape-leads/route.ts": {
+      "maxDuration": 300
+    },
+    "src/app/api/qualify-leads/route.ts": {
+      "maxDuration": 120
+    },
+    "src/app/api/generate-strategy/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/estimate-budget/route.ts": {
+      "maxDuration": 30
+    },
+    "src/app/api/export-sheets/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/lead-feedback/route.ts": {
+      "maxDuration": 30
+    }
+  }
+}

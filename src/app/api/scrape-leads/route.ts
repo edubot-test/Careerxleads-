@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 
+export const maxDuration = 300; // Vercel Pro max — Apify scraping is slow
+
 const APIFY_TOKEN = process.env.APIFY_API_TOKEN || '';
 const APIFY_BASE  = 'https://api.apify.com/v2';
 
