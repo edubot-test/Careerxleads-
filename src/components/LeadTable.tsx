@@ -85,7 +85,7 @@ export default function LeadTable({
       if (filterReview !== 'all' && lead.reviewFlag !== filterReview) return false;
       if (filterUniversity !== 'all' && lead.university !== filterUniversity) return false;
       if (filterPlatform !== 'all' && lead.metadata?.platform !== filterPlatform) return false;
-      if (searchName && !lead.name.toLowerCase().includes(searchName.toLowerCase())) return false;
+      if (searchName && !(lead.name || '').toLowerCase().includes(searchName.toLowerCase())) return false;
       return true;
     });
     result.sort((a, b) => {
@@ -150,7 +150,7 @@ export default function LeadTable({
 
   const handleCopyEmail = (lead: Lead) => {
     if (!lead.email) return;
-    navigator.clipboard.writeText(lead.email);
+    navigator.clipboard.writeText(lead.email).catch(() => { /* clipboard denied */ });
     setCopiedId(lead.id);
     setTimeout(() => setCopiedId(null), 2000);
   };
@@ -195,6 +195,7 @@ export default function LeadTable({
     const csv = '\ufeff' + [headers.map(h => `"${h}"`).join(','), ...rows.map(r => r.join(','))].join('\n');
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
     const a = document.createElement('a'); a.href = url; a.download = 'careerx_leads.csv'; a.click();
+    URL.revokeObjectURL(url);
   };
 
   const SortIcon = ({ col }: { col: SortKey }) => {

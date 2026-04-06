@@ -156,7 +156,7 @@ export function normalizeGoogle(item: any, idx: number, actor: string): any {
 // Extract email from arbitrary text (used for PDF snippet + README)
 function extractEmailFromText(text: string): string | null {
   if (!text) return null;
-  const m = text.match(/\b([a-zA-Z0-9._%+\-]+@(?!.*\bnoreply\b)[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})\b/);
+  const m = text.match(/\b((?!noreply|no-reply|donotreply)[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})\b/);
   return m ? m[1] : null;
 }
 

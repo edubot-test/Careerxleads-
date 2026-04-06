@@ -69,15 +69,18 @@ export async function POST(req: Request) {
     const existingUrlKeys  = new Set<string>();
     const existingNameKeys = new Set<string>();
     try {
-      // Read columns B (Full Name) and C (LinkedIn URL) together
+      // Read columns B (Full Name), C (LinkedIn URL), D (University) for dedup
       const response = await sheets.spreadsheets.values.get({
         spreadsheetId: targetSheetId,
-        range: `${sheetName}!B:C`,
+        range: `${sheetName}!B:D`,
       });
       const rows = response.data.values ?? [];
-      for (const [name, url] of rows) {
+      for (const row of rows) {
+        const name = row[0] || '';
+        const url  = row[1] || '';
+        const uni  = row[2] || '';
         if (url) existingUrlKeys.add(normalizeUrl(url));
-        if (name && !url) existingNameKeys.add(`${(name as string).toLowerCase().trim()}|`);
+        if (name && !url) existingNameKeys.add(`${(name as string).toLowerCase().trim()}|${(uni as string).toLowerCase().trim()}`);
       }
     } catch (e) {
       console.log(`Could not read existing leads from ${sheetName}. Proceeding without dedup.`);

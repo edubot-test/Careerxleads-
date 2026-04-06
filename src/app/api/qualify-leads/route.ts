@@ -9,7 +9,7 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY || '',
 });
 
-const CLAUDE_MODEL = process.env.CLAUDE_MODEL || 'claude-sonnet-4-6';
+const CLAUDE_MODEL = process.env.CLAUDE_MODEL || 'claude-haiku-4-5-20251001';
 const CHUNK_SIZE = 15;
 
 // ── Guardrail constants ──────────────────────────────────────────────────────
@@ -271,8 +271,15 @@ export async function POST(req: Request) {
           continue;
         }
 
-        const preFilterCount = (data.leads || []).length;
-        const filtered = (data.leads || []).filter((l: any) => {
+        const leadsArray = Array.isArray(data.leads) ? data.leads : Array.isArray(data) ? data : [];
+        if (leadsArray.length === 0) {
+          console.warn(`[qualify] Chunk ${i / CHUNK_SIZE + 1}: Claude returned no leads array — falling back to mock`);
+          mockedChunks++;
+          allLeads.push(...chunk.map(computeMockScore).filter((l: Lead) => l.qualityScore >= 6));
+          continue;
+        }
+        const preFilterCount = leadsArray.length;
+        const filtered = leadsArray.filter((l: any) => {
           if ((l.qualityScore ?? 0) < 6) { console.log(`[qualify] Rejected "${l.name}" — qualityScore ${l.qualityScore} < 6`); return false; }
           if (isExperiencedProfessional(l.headline)) { console.log(`[qualify] Rejected "${l.name}" — senior professional`); return false; }
           if (isLowRelevanceField(l.fieldOfStudy))   { console.log(`[qualify] Rejected "${l.name}" — low-relevance field: ${l.fieldOfStudy}`); return false; }

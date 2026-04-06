@@ -103,7 +103,7 @@ export function buildRegionalSuffix(tag: string | undefined, undergradSchool: st
     case 'Malayalam':
       return `\n\nP.S. Kerala engineers${almaRef} in our network consistently land product company offers — the technical foundation is strong, the network just needs to be built.`;
     case 'Hindi':
-      return `\n\nP.S. Transitioning from${almaRef ? almaRef : ' a North Indian college'} to a US product company requires a specific playbook — and we have it.`;
+      return `\n\nP.S. Transitioning from${almaRef || ' a North Indian college'} to a US product company requires a specific playbook — and we have it.`;
     default:
       return '';
   }

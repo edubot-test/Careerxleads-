@@ -147,6 +147,12 @@ export async function POST(req: Request) {
 
         if (response.stop_reason === 'end_turn') break;
 
+        if (response.stop_reason === 'max_tokens') {
+          send('progress', { message: 'Agent response truncated — continuing…', step: 'retry' });
+          messages.push({ role: 'user', content: 'Your previous response was truncated. Please continue.' });
+          continue;
+        }
+
         if (response.stop_reason === 'tool_use') {
           const toolResults: Anthropic.ToolResultBlockParam[] = [];
 
@@ -168,7 +174,9 @@ export async function POST(req: Request) {
                 else                             rawProfiles = await runReddit(queries, limit, send);
 
                 const enriched = platform === 'github'
-                  ? await Promise.all(rawProfiles.map(enrichGitHub))
+                  ? (await Promise.allSettled(rawProfiles.map(enrichGitHub)))
+                      .filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled')
+                      .map(r => r.value)
                   : rawProfiles;
 
                 send('progress', { message: `Qualifying ${enriched.length} profiles from ${platform}…`, step: 'qualifying' });

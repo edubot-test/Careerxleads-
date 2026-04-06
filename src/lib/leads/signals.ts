@@ -134,8 +134,9 @@ export function extractSignals(p: any): SignalSet {
   const OPT_STANDARD_VALIDITY = 365;
   const gradDateEst = gradYrNum > 0 ? getGradDateEstimate(gradYrNum, p.headline || '') : null;
   const daysAgo = gradDateEst ? Math.floor((Date.now() - gradDateEst.getTime()) / 86_400_000) : -1;
-  const optDaysRemaining = (daysAgo >= 0 && daysAgo <= OPT_STANDARD_VALIDITY && jobSearchIntent)
-    ? Math.max(0, OPT_UNEMPLOYMENT_LIMIT - daysAgo) : undefined;
+  const optDaysRemaining = (daysAgo >= 0 && jobSearchIntent)
+    ? (daysAgo <= OPT_STANDARD_VALIDITY ? Math.max(0, OPT_UNEMPLOYMENT_LIMIT - daysAgo) : 0)
+    : undefined;
 
   // ── Profile meta ───────────────────────────────────────────────────────────
   const relevantField = !LOW_FIELDS.some(f => fieldOfStudy.toLowerCase().includes(f));

@@ -89,13 +89,13 @@ export default function LeadDrawer({ lead, editedMessages, onClose, onEdit, onRe
               {lead.email && (
                 <div className={styles.emailCell}>
                   <span className={styles.emailText}>{lead.email}</span>
-                  <button className={styles.copyBtn} onClick={() => navigator.clipboard.writeText(lead.email!)} title="Copy email"><FiCopy size={11} /></button>
+                  <button className={styles.copyBtn} onClick={() => navigator.clipboard.writeText(lead.email!).catch(() => {})} title="Copy email"><FiCopy size={11} /></button>
                 </div>
               )}
               {lead.phone && (
                 <div className={styles.emailCell}>
                   <span className={styles.emailText} style={{ color: '#16a34a' }}>📱 {lead.phone}</span>
-                  <button className={styles.copyBtn} onClick={() => navigator.clipboard.writeText(lead.phone!)} title="Copy WhatsApp / phone"><FiCopy size={11} /></button>
+                  <button className={styles.copyBtn} onClick={() => navigator.clipboard.writeText(lead.phone!).catch(() => {})} title="Copy WhatsApp / phone"><FiCopy size={11} /></button>
                 </div>
               )}
             </div>

@@ -109,6 +109,7 @@ export default function Home() {
       // Timeout: abort if no data received for 2 minutes
       let lastDataAt = Date.now();
       const SSE_TIMEOUT_MS = 120_000;
+      let receivedComplete = false;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -168,6 +169,7 @@ export default function Home() {
               return updated;
             });
 
+            receivedComplete = true;
             setPhase('results');
           } else if (event === 'error') {
             throw new Error(String(data.message ?? 'Agent error'));
@@ -178,6 +180,11 @@ export default function Home() {
         if (Date.now() - lastDataAt > SSE_TIMEOUT_MS) {
           throw new Error('Connection timed out — no data received for 2 minutes.');
         }
+      }
+
+      // If stream ended without a 'complete' or 'error' event, surface an error
+      if (!receivedComplete) {
+        throw new Error('Agent stream ended unexpectedly — no results received. Please retry.');
       }
     } catch (err: unknown) {
       stopTimer();

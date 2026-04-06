@@ -9,7 +9,7 @@ const anthropic = new Anthropic({
 
 export const maxDuration = 60; // Strategy generation needs Claude API call
 
-const CLAUDE_MODEL = process.env.CLAUDE_MODEL || 'claude-sonnet-4-6';
+const CLAUDE_MODEL = process.env.CLAUDE_MODEL || 'claude-haiku-4-5-20251001';
 
 // ── Actor Catalog ─────────────────────────────────────────────────────────────
 // Tier 1: High-yield, identity-rich profiles — always include at least one
