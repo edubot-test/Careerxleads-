@@ -80,12 +80,48 @@ export function normalizeLinkedIn(item: any, idx: number, actor: string): any {
       ? (e.endDate?.text || e.endDate?.year?.toString() || '')
       : (e.endDate || e.timePeriod?.endDate?.year?.toString() || ''),
   })) : [];
+
+  // Extract email from ALL possible fields — Apify actors return it in different places
+  const email = item.email
+    || item.emailAddress
+    || item.contactInfo?.emailAddress
+    || item.contactInfo?.email
+    || (Array.isArray(item.emails) ? item.emails[0] : null)
+    || item.personalEmail
+    || item.workEmail
+    || extractEmailFromText(item.summary || '')
+    || null;
+
+  // Extract phone from ALL possible fields
+  const phone = item.phone
+    || item.phoneNumber
+    || item.contactInfo?.phoneNumber
+    || (Array.isArray(item.phoneNumbers) ? (item.phoneNumbers[0]?.number || item.phoneNumbers[0]) : null)
+    || (Array.isArray(item.phones) ? (item.phones[0]?.number || item.phones[0]) : null)
+    || item.contactInfo?.phone
+    || null;
+
+  // Extract websites/Twitter from contact info — useful for alternative outreach
+  const websites = item.contactInfo?.websites || item.websites || [];
+  const twitterHandle = item.contactInfo?.twitter || item.twitterHandle || null;
+
   return {
     id: item.id || item.profileId || `li-${idx}`,
     fullName, linkedinUrl: item.linkedinUrl || item.profileUrl || item.url || '',
-    headline, location, education, email: item.email || null,
-    metadata: { platform: 'LinkedIn', actor },
+    headline, location, education,
+    email, phone,
+    experience: item.experience || item.positions || [],
+    languages: item.languages || [],
+    organizations: item.volunteerExperiences || item.organizations || [],
+    metadata: { platform: 'LinkedIn', actor, websites, twitterHandle },
   };
+}
+
+// Extract email from arbitrary text (used for PDF snippet + README + summary)
+function extractEmailFromText(text: string): string | null {
+  if (!text) return null;
+  const m = text.match(/\b((?!noreply|no-reply|donotreply)[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})\b/);
+  return m ? m[1] : null;
 }
 
 // ── Phone extractor — works on PDF snippets, README text, bios ───────────────
@@ -151,13 +187,6 @@ export function normalizeGoogle(item: any, idx: number, actor: string): any {
     email: email || null, phone: phone || null,
     metadata: { platform: 'Google', actor, snippet: snip, isPdfResume: isPdf },
   };
-}
-
-// Extract email from arbitrary text (used for PDF snippet + README)
-function extractEmailFromText(text: string): string | null {
-  if (!text) return null;
-  const m = text.match(/\b((?!noreply|no-reply|donotreply)[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})\b/);
-  return m ? m[1] : null;
 }
 
 export function normalizeGitHub(item: any, idx: number, actor: string): any {
