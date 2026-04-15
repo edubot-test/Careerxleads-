@@ -5,7 +5,8 @@
 
 const APOLLO_API_KEY = process.env.APOLLO_API_KEY || '';
 const APOLLO_BASE = 'https://api.apollo.io/api/v1';
-const ENRICHMENT_CONCURRENCY = 5; // parallel requests
+const ENRICHMENT_CONCURRENCY = 3; // parallel requests (conservative for free tier)
+const MAX_ENRICHMENTS_PER_RUN = 50; // cap per run to conserve free credits
 
 interface ApolloMatch {
   email: string | null;
@@ -92,13 +93,15 @@ export async function enrichWithApollo(
     return profiles;
   }
 
-  // Only enrich profiles missing email
-  const needsEnrichment = profiles.filter(p => !p.email);
+  // Only enrich profiles missing email, capped to conserve free credits
+  const allNeedsEnrichment = profiles.filter(p => !p.email);
   const alreadyHasEmail = profiles.filter(p => p.email);
+  const needsEnrichment = allNeedsEnrichment.slice(0, MAX_ENRICHMENTS_PER_RUN);
+  const skipped = allNeedsEnrichment.slice(MAX_ENRICHMENTS_PER_RUN);
 
   if (needsEnrichment.length === 0) return profiles;
 
-  console.log(`[Apollo] Enriching ${needsEnrichment.length}/${profiles.length} profiles (${alreadyHasEmail.length} already have email)`);
+  console.log(`[Apollo] Enriching ${needsEnrichment.length}/${profiles.length} profiles (${alreadyHasEmail.length} have email, ${skipped.length} skipped to save credits)`);
 
   const enriched: any[] = [...alreadyHasEmail];
   let enrichedCount = 0;
@@ -147,6 +150,9 @@ export async function enrichWithApollo(
     onProgress?.(enrichedCount, needsEnrichment.length);
   }
 
-  console.log(`[Apollo] Enriched ${enrichedCount}/${needsEnrichment.length} profiles with email/phone`);
+  // Add back skipped profiles (exceeded per-run cap)
+  enriched.push(...skipped);
+
+  console.log(`[Apollo] Enriched ${enrichedCount}/${needsEnrichment.length} profiles with email/phone (${skipped.length} skipped to save credits)`);
   return enriched;
 }
