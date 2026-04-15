@@ -2,7 +2,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { mkdirSync } from 'fs';
 import { writeFile } from 'fs/promises';
 import { join } from 'path';
-import { MOCK_PROFILES, runLinkedIn, runGoogle, runGitHub, runReddit, enrichGitHub } from '@/lib/leads/scrapers';
+import { MOCK_PROFILES, runLinkedIn, runGoogle, runGitHub, runReddit, enrichGitHub, checkApifyCredits } from '@/lib/leads/scrapers';
 import type { SendEvent } from '@/lib/leads/scrapers';
 import { mockScore, qualifyProfiles } from '@/lib/leads/qualification';
 import { formatRejectionFeedback } from '@/lib/leads/rejection';
@@ -108,6 +108,20 @@ export async function POST(req: Request) {
         } catch { /* no-op */ }
         send('complete', { leads: mockLeads, stats: { scraped: MOCK_PROFILES.length, qualified: mockLeads.length, rejected: MOCK_PROFILES.length - mockLeads.length }, isMock: true, mockReason: 'ANTHROPIC_API_KEY not set' });
         return;
+      }
+
+      // ── Check Apify credits upfront ───────────────────────────────────────
+      const apifyStatus = await checkApifyCredits();
+      if (!apifyStatus.ok) {
+        send('status', { message: `⚠️ ${apifyStatus.message}`, step: 'credit_check' });
+        const mockLeads = MOCK_PROFILES.map(mockScore).filter(l => l.qualityScore >= 6);
+        send('complete', { leads: mockLeads, stats: { scraped: MOCK_PROFILES.length, qualified: mockLeads.length, rejected: MOCK_PROFILES.length - mockLeads.length }, isMock: true, mockReason: apifyStatus.message });
+        return;
+      }
+      if (apifyStatus.remainingUsd < 1.0) {
+        send('status', { message: `⚠️ ${apifyStatus.message}`, step: 'credit_check' });
+      } else {
+        send('status', { message: `✓ ${apifyStatus.message}`, step: 'credit_check' });
       }
 
       const targetCount = parseInt(params.leadCount, 10) || 50;

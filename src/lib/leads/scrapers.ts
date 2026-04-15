@@ -18,6 +18,41 @@ export const MOCK_PROFILES = Array.from({ length: 45 }).map((_, i) => ({
   metadata: { platform: 'LinkedIn', actor: 'mock' },
 }));
 
+// ── Apify credit check ────────────────────────────────────────────────────────
+export interface ApifyCreditStatus {
+  ok: boolean;
+  remainingUsd: number;
+  message: string;
+}
+
+export async function checkApifyCredits(): Promise<ApifyCreditStatus> {
+  if (!APIFY_TOKEN) {
+    return { ok: false, remainingUsd: 0, message: 'APIFY_API_TOKEN not configured — will use demo data' };
+  }
+  try {
+    const res = await fetch(`${APIFY_BASE}/users/me?token=${APIFY_TOKEN}`);
+    if (!res.ok) {
+      if (res.status === 401) return { ok: false, remainingUsd: 0, message: 'Apify API token is invalid or expired' };
+      return { ok: false, remainingUsd: 0, message: `Apify API error: HTTP ${res.status}` };
+    }
+    const data = await res.json();
+    const plan = data?.data?.plan;
+    const usage = data?.data?.usageTotalUsd ?? 0;
+    const limit = plan?.monthlyUsageLimitUsd ?? 0;
+    const remaining = Math.max(0, limit - usage);
+
+    if (remaining <= 0.01) {
+      return { ok: false, remainingUsd: 0, message: `Apify credits exhausted — $${usage.toFixed(2)} used of $${limit.toFixed(2)} monthly limit` };
+    }
+    if (remaining < 1.0) {
+      return { ok: true, remainingUsd: remaining, message: `Apify credits low — $${remaining.toFixed(2)} remaining of $${limit.toFixed(2)} monthly limit` };
+    }
+    return { ok: true, remainingUsd: remaining, message: `Apify credits OK — $${remaining.toFixed(2)} remaining` };
+  } catch (err) {
+    return { ok: false, remainingUsd: 0, message: `Cannot check Apify credits: ${(err as Error).message}` };
+  }
+}
+
 // ── Apify helpers ──────────────────────────────────────────────────────────────
 async function apifyPost(path: string, body: unknown): Promise<any> {
   const res = await fetch(`${APIFY_BASE}${path}?token=${APIFY_TOKEN}`, {

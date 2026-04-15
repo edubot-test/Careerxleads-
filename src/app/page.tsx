@@ -131,7 +131,9 @@ export default function Home() {
           const { event, data } = parsed;
           if (!event || !data) continue;
 
-          if (event === 'progress') {
+          if (event === 'status') {
+            addLog(String(data.message ?? ''));
+          } else if (event === 'progress') {
             addLog(String(data.message ?? ''));
           } else if (event === 'tool_start') {
             setActivePlatform(String(data.platform ?? ''));
