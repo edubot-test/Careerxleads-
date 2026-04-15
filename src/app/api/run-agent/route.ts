@@ -125,7 +125,8 @@ export async function POST(req: Request) {
       }
 
       const targetCount = parseInt(params.leadCount, 10) || 50;
-      const MAX_ITER    = Math.max(20, Math.ceil(targetCount / 30));
+      const MAX_ITER    = Math.min(5, Math.max(2, Math.ceil(targetCount / 30))); // cap at 5 iterations max
+      const RUN_DEADLINE = Date.now() + 240_000; // hard 4-minute deadline for entire run
       const allLeads: any[] = [];
       const allRejectedLeads: any[] = [];
       const seenKeys = new Set<string>();
@@ -149,6 +150,11 @@ export async function POST(req: Request) {
       send('status', { message: 'Agent initialising…', step: 'start' });
 
       while (!done && allLeads.length < targetCount && iteration < MAX_ITER) {
+        // Hard deadline — stop gracefully if running too long
+        if (Date.now() > RUN_DEADLINE) {
+          send('progress', { message: `⏱️ Time limit reached (4 min). Returning ${allLeads.length} leads found so far.`, step: 'deadline' });
+          break;
+        }
         iteration++;
         const response = await anthropic.messages.create({
           model: CLAUDE_MODEL,

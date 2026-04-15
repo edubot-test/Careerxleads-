@@ -86,7 +86,7 @@ async function startActorRun(actorId: string, input: unknown): Promise<{ runId: 
 
 async function pollRun(actorId: string, runId: string, datasetId: string, limit: number, send: SendEvent): Promise<any[]> {
   const start = Date.now();
-  const TIMEOUT = 180_000;
+  const TIMEOUT = 90_000; // 90s per actor (was 180s — too slow)
   while (Date.now() - start < TIMEOUT) {
     await new Promise(r => setTimeout(r, 5000));
     const { data: { status } } = await apifyGet(`/actor-runs/${runId}`);
