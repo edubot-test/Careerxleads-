@@ -266,6 +266,11 @@ export async function POST(req: Request) {
 
                 send('tool_done', { platform, scraped: rawProfiles.length, qualifiedNew: newCount, totalQualified: allLeads.length, t1, t2, t3 });
 
+                // Stream partial results so frontend has leads even if run is interrupted
+                if (newCount > 0) {
+                  send('partial_results', { leads: allLeads, stats: { scraped: rawProfiles.length, qualified: allLeads.length, rejected: rawProfiles.length - newCount } });
+                }
+
                 result = {
                   success: true,
                   scraped: rawProfiles.length,

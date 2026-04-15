@@ -140,6 +140,20 @@ export default function Home() {
             addLog(`Searching ${data.platform}…`);
           } else if (event === 'tool_done') {
             addLog(`${data.platform}: ${data.qualifiedNew} new leads (total ${data.totalQualified})`);
+          } else if (event === 'partial_results') {
+            // Update leads incrementally — visible even if run is interrupted
+            const partialLeads = Array.isArray(data.leads) ? data.leads as Lead[] : [];
+            if (partialLeads.length > 0) {
+              const seenPartial = new Set<string>();
+              const deduped = partialLeads.filter(l => {
+                if (!l || typeof l.id !== 'string') return false;
+                if (seenPartial.has(l.id)) return false;
+                seenPartial.add(l.id);
+                return true;
+              });
+              setLeads(deduped);
+              setStats((data.stats as PipelineStats) || { scraped: deduped.length, qualified: deduped.length, rejected: 0 });
+            }
           } else if (event === 'cost_estimate') {
             addLog(`Tokens: ${Number(data.inputTokens ?? 0).toLocaleString()} in / ${Number(data.outputTokens ?? 0).toLocaleString()} out · ~$${data.estimatedCostUsd} est.`);
           } else if (event === 'complete') {
