@@ -8,6 +8,7 @@ import { mockScore, qualifyProfiles } from '@/lib/leads/qualification';
 import { formatRejectionFeedback } from '@/lib/leads/rejection';
 import { buildAgentPrompt } from '@/lib/leads/queries';
 import { isEliteUni, SENIOR_TITLES, LOW_FIELDS } from '@/lib/leads/patterns';
+import { enrichWithApollo } from '@/lib/leads/enrichment';
 import { requireAuth } from '@/lib/auth';
 
 export const maxDuration = 300; // Vercel Pro max
@@ -173,11 +174,17 @@ export async function POST(req: Request) {
                 else if (platform === 'github')  rawProfiles = await runGitHub(queries, limit, send);
                 else                             rawProfiles = await runReddit(queries, limit, send);
 
-                const enriched = platform === 'github'
+                const gitHubEnriched = platform === 'github'
                   ? (await Promise.allSettled(rawProfiles.map(enrichGitHub)))
                       .filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled')
                       .map(r => r.value)
                   : rawProfiles;
+
+                // Apollo.io email enrichment — find emails for profiles missing them
+                send('progress', { message: `Enriching ${gitHubEnriched.length} profiles with email lookup…`, step: 'enriching' });
+                const enriched = await enrichWithApollo(gitHubEnriched, (done, total) => {
+                  send('progress', { message: `Email enrichment: ${done}/${total} found`, step: 'enriching' });
+                });
 
                 send('progress', { message: `Qualifying ${enriched.length} profiles from ${platform}…`, step: 'qualifying' });
                 const qualified = await qualifyProfiles(enriched, params, addTokens);

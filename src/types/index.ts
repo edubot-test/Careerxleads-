@@ -17,6 +17,8 @@ export interface Lead {
   intentScore: number;   // 1, 2, or 3
   qualityScore: number;  // 0–10 composite quality score
   outreachMessage: string;
+  linkedInNote?: string;      // 300-char connection request note for LinkedIn
+  whatsAppUrl?: string | null; // wa.me URL with pre-filled message
   status: 'new' | 'contacted' | 'replied' | 'call booked' | 'converted';
   reviewFlag: 'approved' | 'review_needed';
   feedback?: 'good_lead' | 'irrelevant_lead' | 'converted_lead';

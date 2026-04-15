@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { extractSignals } from './signals';
 import { calcStruggleScore, assignTier } from './scoring';
-import { buildOutreachMessage } from './outreach';
+import { buildOutreachMessage, buildLinkedInNote, buildWhatsAppUrl } from './outreach';
 import type { OutreachContext } from './outreach';
 import { buildRegionalSuffix } from './regional';
 import { isEliteUni, SENIOR_TITLES, LOW_FIELDS } from './patterns';
@@ -86,6 +86,8 @@ export function mockScore(p: any): any {
     detectedLanguage: regionalTag || undefined,
     regionalTag: regionalTag || undefined,
     outreachMessage,
+    linkedInNote: buildLinkedInNote(ctx, signals),
+    whatsAppUrl: buildWhatsAppUrl(p.phone || null, ctx.firstName, fieldOfStudy),
     status: 'new',
     reviewFlag: qualityScore >= 8 ? 'approved' : 'review_needed',
     qualityBreakdown: { euRelevant, mastersStudent, jobSearchIntent, relevantField, profileComplete, nonTier1University: true },
@@ -209,6 +211,11 @@ RESPOND ONLY WITH VALID JSON:
           detectedLanguage: signals.regionalTag || undefined,
           regionalTag: signals.regionalTag || undefined,
           outreachMessage,
+          linkedInNote: buildLinkedInNote(
+            { firstName: (l.name || '').split(' ')[0] || 'there', university: l.university || '', degree: l.degree || '', fieldOfStudy: l.fieldOfStudy || '', graduationYear: l.graduationYear || '' },
+            signals,
+          ),
+          whatsAppUrl: buildWhatsAppUrl(l.phone || phoneMap.get(String(l.id)) || null, (l.name || '').split(' ')[0], l.fieldOfStudy || ''),
           tier,
         };
       });

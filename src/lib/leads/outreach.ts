@@ -54,3 +54,50 @@ export function buildOutreachMessage(ctx: OutreachContext, s: SignalSet): string
 
   return `Hi ${firstName},\n\n${body} CareerX helps people go from applications to real offers. Worth a quick chat?`;
 }
+
+/**
+ * Generate a short LinkedIn connection request note (max 300 chars).
+ * LinkedIn limits connection notes to 300 characters.
+ */
+export function buildLinkedInNote(ctx: OutreachContext, s: SignalSet): string {
+  const { firstName, fieldOfStudy, university } = ctx;
+  const name = firstName || 'there';
+
+  // Pick the most relevant short hook
+  let hook: string;
+  if (s.careerSwitch)
+    hook = `making a career switch into ${fieldOfStudy || 'tech'}`;
+  else if (s.visaStruggle || s.workPermitPanic)
+    hook = `navigating work permits in ${fieldOfStudy || 'your field'}`;
+  else if (s.frustration)
+    hook = `the tough ${fieldOfStudy || 'job'} market right now`;
+  else if (s.jobSearchIntent)
+    hook = `your job search in ${fieldOfStudy || 'your field'}`;
+  else if (university)
+    hook = `your ${fieldOfStudy || 'studies'} at ${university}`;
+  else
+    hook = `your background in ${fieldOfStudy || 'your field'}`;
+
+  const note = `Hi ${name}, noticed ${hook}. CareerX helps people land real offers — from skills to placement. Open to connecting?`;
+
+  // Hard trim to 300 chars
+  return note.length <= 300 ? note : note.slice(0, 297) + '...';
+}
+
+/**
+ * Generate a WhatsApp message URL for a lead with a phone number.
+ * Returns the full wa.me URL with pre-filled message, or null if no phone.
+ */
+export function buildWhatsAppUrl(phone: string | null, firstName: string, fieldOfStudy: string): string | null {
+  if (!phone) return null;
+
+  // Clean phone number — keep only digits and leading +
+  const cleaned = phone.replace(/[^\d+]/g, '');
+  if (cleaned.length < 8) return null;
+
+  const msg = encodeURIComponent(
+    `Hi ${firstName || 'there'}, I came across your profile and thought CareerX could help with your ${fieldOfStudy || 'career'} goals — from skill building to job placement. Would you be open to a quick chat?`
+  );
+
+  return `https://wa.me/${cleaned.replace(/^\+/, '')}?text=${msg}`;
+}

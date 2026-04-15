@@ -95,12 +95,35 @@ export default function LeadDrawer({ lead, editedMessages, onClose, onEdit, onRe
               {lead.phone && (
                 <div className={styles.emailCell}>
                   <span className={styles.emailText} style={{ color: '#16a34a' }}>📱 {lead.phone}</span>
-                  <button className={styles.copyBtn} onClick={() => navigator.clipboard.writeText(lead.phone!).catch(() => {})} title="Copy WhatsApp / phone"><FiCopy size={11} /></button>
+                  <button className={styles.copyBtn} onClick={() => navigator.clipboard.writeText(lead.phone!).catch(() => {})} title="Copy phone"><FiCopy size={11} /></button>
+                  {lead.whatsAppUrl && (
+                    <a href={lead.whatsAppUrl} target="_blank" rel="noopener noreferrer" className={styles.copyBtn} title="Open WhatsApp" style={{ color: '#25D366', textDecoration: 'none' }}>💬</a>
+                  )}
                 </div>
               )}
             </div>
           </div>
         )}
+
+        <div className={styles.drawerSection}>
+          <span className={styles.drawerSectionLabel}>Quick Outreach</span>
+          <div style={{ marginTop: '0.4rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            {lead.linkedInNote && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <span style={{ fontSize: '0.7rem', color: '#0a66c2', fontWeight: 600 }}>LinkedIn Note (300 chars)</span>
+                  <button className={styles.copyBtn} onClick={() => navigator.clipboard.writeText(lead.linkedInNote!).catch(() => {})} title="Copy LinkedIn note"><FiCopy size={11} /></button>
+                </div>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>{lead.linkedInNote}</span>
+              </div>
+            )}
+            {lead.whatsAppUrl && (
+              <a href={lead.whatsAppUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.35rem 0.7rem', background: '#25D366', color: '#fff', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 600, textDecoration: 'none', width: 'fit-content' }}>
+                💬 Open WhatsApp
+              </a>
+            )}
+          </div>
+        </div>
 
         <div className={styles.drawerSection}>
           <span className={styles.drawerSectionLabel}>Status</span>
