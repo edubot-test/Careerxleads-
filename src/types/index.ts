@@ -19,6 +19,7 @@ export interface Lead {
   outreachMessage: string;
   linkedInNote?: string;      // 300-char connection request note for LinkedIn
   whatsAppUrl?: string | null; // wa.me URL with pre-filled message
+  assignedTo?: string;          // team member name this lead is assigned to
   status: 'new' | 'contacted' | 'replied' | 'call booked' | 'converted';
   reviewFlag: 'approved' | 'review_needed';
   feedback?: 'good_lead' | 'irrelevant_lead' | 'converted_lead';

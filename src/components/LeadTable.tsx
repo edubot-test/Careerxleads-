@@ -9,6 +9,7 @@ import {
   FiChevronLeft, FiChevronRight, FiEdit2, FiCheck,
 } from 'react-icons/fi';
 import LeadDrawer from './LeadDrawer';
+import TeamManager from './TeamManager';
 
 const PAGE_SIZE = 50;
 
@@ -17,6 +18,7 @@ interface LeadTableProps {
   onExportSheets: (leads: Lead[]) => void;
   onFeedback: (lead: Lead, feedback: Lead['feedback']) => void;
   onStatusChange: (leadId: string, status: Lead['status']) => void;
+  onLeadsUpdate: (updater: (prev: Lead[]) => Lead[]) => void;
   isExporting?: boolean;
   stats?: PipelineStats;
 }
@@ -46,13 +48,14 @@ const STATUS_COLORS: Record<string, string> = {
 type SortKey = 'qualityScore' | 'intentScore' | 'graduationYear' | 'name';
 
 export default function LeadTable({
-  leads, onExportSheets, onFeedback, onStatusChange, isExporting = false, stats,
+  leads, onExportSheets, onFeedback, onStatusChange, onLeadsUpdate, isExporting = false, stats,
 }: LeadTableProps) {
   const [minScore, setMinScore]           = useState(6);
   const [filterTier, setFilterTier]       = useState<'all' | '1' | '2' | '3'>('all');
   const [filterReview, setFilterReview]   = useState('all');
   const [filterUniversity, setFilterUniversity] = useState('all');
   const [filterPlatform, setFilterPlatform]     = useState('all');
+  const [filterMember, setFilterMember]   = useState('all');
   const [searchName, setSearchName]       = useState('');
   const [sortBy, setSortBy]               = useState<SortKey>('qualityScore');
   const [sortDir, setSortDir]             = useState<'desc' | 'asc'>('desc');
@@ -85,6 +88,10 @@ export default function LeadTable({
       if (filterReview !== 'all' && lead.reviewFlag !== filterReview) return false;
       if (filterUniversity !== 'all' && lead.university !== filterUniversity) return false;
       if (filterPlatform !== 'all' && lead.metadata?.platform !== filterPlatform) return false;
+      if (filterMember !== 'all') {
+        if (filterMember === 'unassigned' && lead.assignedTo) return false;
+        if (filterMember !== 'unassigned' && lead.assignedTo !== filterMember) return false;
+      }
       if (searchName && !(lead.name || '').toLowerCase().includes(searchName.toLowerCase())) return false;
       return true;
     });
@@ -98,7 +105,7 @@ export default function LeadTable({
       return av > bv ? 1 : av < bv ? -1 : 0;
     });
     return result;
-  }, [leads, minScore, filterTier, filterReview, filterUniversity, filterPlatform, searchName, sortBy, sortDir]);
+  }, [leads, minScore, filterTier, filterReview, filterUniversity, filterPlatform, filterMember, searchName, sortBy, sortDir]);
 
   // Reset to first page whenever filtered set changes
   useEffect(() => { setPage(0); }, [filteredLeads]);
@@ -154,6 +161,25 @@ export default function LeadTable({
     setCopiedId(lead.id);
     setTimeout(() => setCopiedId(null), 2000);
   };
+
+  const handleCopyLinkedInNote = (lead: Lead) => {
+    if (!lead.linkedInNote) return;
+    navigator.clipboard.writeText(lead.linkedInNote).catch(() => {});
+    setCopiedId(`li-${lead.id}`);
+    setTimeout(() => setCopiedId(null), 1500);
+  };
+
+  const handleTeamAssign = (assignments: Record<string, string>) => {
+    onLeadsUpdate(prev => prev.map(l => ({
+      ...l,
+      assignedTo: assignments[l.id] ?? l.assignedTo,
+    })));
+  };
+
+  const teamMembers = useMemo(
+    () => Array.from(new Set(leads.map(l => l.assignedTo).filter(Boolean) as string[])).sort(),
+    [leads],
+  );
 
   const exportCSV = () => {
     const headers = [
@@ -289,6 +315,14 @@ export default function LeadTable({
               {platforms.map(p => <option key={p} value={p}>{p}</option>)}
             </select>
           )}
+          {teamMembers.length > 0 && (
+            <select className="input-field" value={filterMember} onChange={e => setFilterMember(e.target.value)}>
+              <option value="all">All Members</option>
+              <option value="unassigned">Unassigned</option>
+              {teamMembers.map(m => <option key={m} value={m}>{m}</option>)}
+            </select>
+          )}
+          <TeamManager leads={leads} onAssign={handleTeamAssign} />
         </div>
       </div>
 
@@ -484,10 +518,26 @@ export default function LeadTable({
                       {lead.phone && (
                         <div className={styles.emailCell} style={{ marginTop: '3px' }}>
                           <span className={styles.emailText} style={{ color: '#16a34a', fontSize: '0.72rem' }}>📱 {lead.phone}</span>
-                          <button className={styles.copyBtn} onClick={() => { navigator.clipboard.writeText(lead.phone!); }} title="Copy phone / WhatsApp">
+                          <button className={styles.copyBtn} onClick={() => { navigator.clipboard.writeText(lead.phone!).catch(() => {}); }} title="Copy phone / WhatsApp">
                             <FiCopy size={11} />
                           </button>
+                          {lead.whatsAppUrl && (
+                            <a href={lead.whatsAppUrl} target="_blank" rel="noopener noreferrer" className={styles.copyBtn} title="WhatsApp" style={{ color: '#25D366' }}>💬</a>
+                          )}
                         </div>
+                      )}
+                      {lead.linkedInNote && (
+                        <div className={styles.emailCell} style={{ marginTop: '3px' }}>
+                          <span className={styles.emailText} style={{ color: '#0a66c2', fontSize: '0.68rem' }}>LI Note</span>
+                          <button className={styles.copyBtn} onClick={() => handleCopyLinkedInNote(lead)} title="Copy LinkedIn connection note">
+                            {copiedId === `li-${lead.id}` ? <FiCheck size={11} color="#10b981" /> : <FiCopy size={11} />}
+                          </button>
+                        </div>
+                      )}
+                      {lead.assignedTo && (
+                        <span style={{ display: 'inline-block', marginTop: '3px', fontSize: '0.65rem', padding: '0.1rem 0.35rem', background: 'var(--accent-primary)', color: '#fff', borderRadius: '4px' }}>
+                          {lead.assignedTo}
+                        </span>
                       )}
                     </td>
 

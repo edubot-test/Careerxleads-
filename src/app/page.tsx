@@ -393,6 +393,7 @@ export default function Home() {
               onExportSheets={handleExportSheets}
               onFeedback={handleLeadFeedback}
               onStatusChange={handleStatusChange}
+              onLeadsUpdate={setLeads}
               isExporting={isExporting}
               stats={stats ?? undefined}
             />
